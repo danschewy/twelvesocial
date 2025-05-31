@@ -88,7 +88,7 @@ export async function uploadVideoToIndex(
 
     const taskParams: any = {
       indexId: indexId,
-      file: videoStream,
+      video_file: videoStream,
       // language: language, // Temporarily removed
     };
 
