@@ -1,0 +1,38 @@
+# Docker specific
+Dockerfile
+.dockerignore
+
+# Git specific
+.git
+.gitignore
+
+# Node.js specific
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Next.js specific
+.next
+out
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Editor directories and files
+.vscode
+.idea
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db 
