@@ -111,7 +111,7 @@ What would you like to do with your video?`,
         id: `analysis-${Date.now()}`,
         text: `✅ **Analysis Complete!** I've analyzed your video and found it's a **${videoAnalysis.insights.contentType}** with ${videoAnalysis.insights.estimatedClipCount} potential clips.
 
-**Ready to create clips!** Just tell me what you're looking for and I'll generate the perfect search queries.`,
+**Ready to create clips!** Just tell me what you&apos;re looking for and I&apos;ll generate the perfect search queries.`,
         sender: "bot",
         timestamp: new Date(),
       };
