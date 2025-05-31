@@ -24,11 +24,28 @@ interface SearchPromptData {
   notesForUser: string;
 }
 
+// Add GeneratedClipInfo interface here
+interface GeneratedClipInfo {
+  id?: string;
+  fileName: string;
+  downloadUrl: string;
+  message: string;
+  error?: string;
+}
+
 export default function UploadPage() {
   const [videoId, setVideoId] = useState<string | null>(null);
   const [uploadedVideoFile, setUploadedVideoFile] = useState<File | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
-
+  // State for clip generation
+  const [selectedClips, setSelectedClips] = useState<SearchClipData[]>([]);
+  const [isGeneratingClips, setIsGeneratingClips] = useState<boolean>(false);
+  const [generatedClipResults, setGeneratedClipResults] = useState<
+    GeneratedClipInfo[] | null
+  >(null);
+  const [clipGenerationError, setClipGenerationError] = useState<string | null>(
+    null
+  );
   // State for AI-generated search prompts
   const [aiSearchPrompts, setAiSearchPrompts] =
     useState<SearchPromptData | null>(null);
@@ -208,10 +225,19 @@ export default function UploadPage() {
     setSearchError(null);
   };
 
+  // Reset more states when video changes
+  const resetAllClipStates = () => {
+    resetSearchState();
+    setSelectedClips([]);
+    setIsGeneratingClips(false);
+    setGeneratedClipResults(null);
+    setClipGenerationError(null);
+  };
+
   const handleVideoUploaded = async (file: File, twelveLabsVideoId: string) => {
     setVideoId(twelveLabsVideoId);
     setSelectedExistingVideo(null);
-    resetSearchState();
+    resetAllClipStates();
     console.log(
       "Newly uploaded video processed by Twelve Labs. Video ID:",
       twelveLabsVideoId
@@ -263,7 +289,7 @@ export default function UploadPage() {
       setSelectedExistingVideo(videoTask);
       setUploadedVideoFile(null);
       setSelectedVideoHlsUrl(null); // Clear any previous HLS URL immediately
-      resetSearchState();
+      resetAllClipStates();
       console.log(
         "Existing video selected, Twelve Labs Video ID:",
         videoTask.video_id
@@ -342,6 +368,8 @@ export default function UploadPage() {
     }
     setSearchResults(null); // Clear previous results when new prompts are generated
     setSearchError(null);
+    setSelectedClips([]); // Clear selections when new prompts/searches happen
+    setGeneratedClipResults(null);
   };
 
   const handleSearchClips = async () => {
@@ -389,6 +417,9 @@ export default function UploadPage() {
       console.log("Search results received:", results);
       if (results.data) {
         setSearchResults(results.data);
+        setSelectedClips([]); // Clear selections if search is re-run
+        setGeneratedClipResults(null);
+        setClipGenerationError(null);
       } else {
         setSearchResults([]); // Should ideally not happen if API is consistent
         console.warn("Search API returned success but no data field.");
@@ -403,6 +434,81 @@ export default function UploadPage() {
       setSearchResults([]); // Ensure results are cleared on error
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleToggleClipSelection = (clip: SearchClipData) => {
+    setSelectedClips((prevSelected) => {
+      if (
+        prevSelected.find(
+          (sc) =>
+            sc.start === clip.start &&
+            sc.end === clip.end &&
+            sc.video_id === clip.video_id
+        )
+      ) {
+        return prevSelected.filter(
+          (sc) =>
+            !(
+              sc.start === clip.start &&
+              sc.end === clip.end &&
+              sc.video_id === clip.video_id
+            )
+        );
+      } else {
+        return [...prevSelected, clip];
+      }
+    });
+  };
+
+  const handleGenerateClips = async () => {
+    if (!videoId || selectedClips.length === 0) {
+      alert("Please select a video and at least one clip to generate.");
+      return;
+    }
+    setIsGeneratingClips(true);
+    setGeneratedClipResults(null);
+    setClipGenerationError(null);
+
+    const segmentsToGenerate = selectedClips.map((clip) => ({
+      id: `${clip.video_id}_${clip.start}_${clip.end}`, // Create a unique-ish ID for tracking if needed
+      start: clip.start,
+      end: clip.end,
+    }));
+
+    try {
+      const response = await fetch("/api/generate-clip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoId, segments: segmentsToGenerate }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.details ||
+            errorData.message ||
+            "Failed to start clip generation"
+        );
+      }
+      const result = await response.json();
+      setGeneratedClipResults(result.data);
+      if (result.data.some((clip: GeneratedClipInfo) => clip.error)) {
+        setClipGenerationError(
+          "Some clips could not be generated. Check details below."
+        );
+      }
+    } catch (error: unknown) {
+      console.error("Error generating clips:", error);
+      if (error instanceof Error) {
+        setClipGenerationError(error.message);
+      } else {
+        setClipGenerationError(
+          "An unknown error occurred during clip generation."
+        );
+      }
+    } finally {
+      setIsGeneratingClips(false);
     }
   };
 
@@ -605,11 +711,34 @@ export default function UploadPage() {
                                 Score: {clip.score.toFixed(2)} | Confidence:{" "}
                                 {clip.confidence}
                               </p>
-                              {/* TODO: Add selection checkbox/button here */}
                             </div>
+                            <input
+                              type="checkbox"
+                              className="ml-auto h-5 w-5 text-blue-500 bg-gray-600 border-gray-500 rounded focus:ring-blue-400 focus:ring-offset-gray-800"
+                              checked={selectedClips.some(
+                                (sc) =>
+                                  sc.start === clip.start &&
+                                  sc.end === clip.end &&
+                                  sc.video_id === clip.video_id
+                              )}
+                              onChange={() => handleToggleClipSelection(clip)}
+                            />
                           </div>
                         ))}
                       </div>
+                    )}
+                    {searchResults && searchResults.length > 0 && (
+                      <button
+                        onClick={handleGenerateClips}
+                        disabled={
+                          isGeneratingClips || selectedClips.length === 0
+                        }
+                        className="mt-4 w-full px-4 py-2.5 bg-purple-600 text-white font-semibold rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 transition-colors"
+                      >
+                        {isGeneratingClips
+                          ? "Generating Clips..."
+                          : `Generate ${selectedClips.length} Selected Clip(s)`}
+                      </button>
                     )}
                   </>
                 )}
@@ -662,6 +791,69 @@ export default function UploadPage() {
           </div>
         </div>
       </div>
+      {/* Generated Clips Results Section */}
+      {(isGeneratingClips || clipGenerationError || generatedClipResults) &&
+        videoId && (
+          <div className="mt-6 pt-6 border-t border-gray-700">
+            <h2 className="text-2xl font-semibold mb-4">
+              5. Generated Video Clips
+            </h2>
+            {isGeneratingClips && (
+              <p className="text-center text-gray-300">
+                Clips are being generated by FFmpeg, please wait...
+              </p>
+            )}
+            {clipGenerationError && (
+              <p className="text-red-400 text-center">
+                Error during clip generation: {clipGenerationError}
+              </p>
+            )}
+            {generatedClipResults && !isGeneratingClips && (
+              <>
+                {generatedClipResults.length === 0 && !clipGenerationError && (
+                  <p className="text-gray-400 text-center">
+                    No clips were generated or generation failed silently.
+                  </p>
+                )}
+                {generatedClipResults.length > 0 && (
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                    {generatedClipResults.map((gClip, index) => (
+                      <div
+                        key={gClip.id || index}
+                        className={`bg-gray-700/50 p-3 rounded-md ${
+                          gClip.error ? "border border-red-500" : ""
+                        }`}
+                      >
+                        <p
+                          className="text-sm font-semibold truncate"
+                          title={gClip.fileName}
+                        >
+                          {gClip.fileName}
+                        </p>
+                        {gClip.error ? (
+                          <p className="text-xs text-red-400">
+                            Error: {gClip.error}
+                          </p>
+                        ) : (
+                          <a
+                            href={gClip.downloadUrl}
+                            download
+                            className="mt-1 inline-block px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+                          >
+                            Download Clip
+                          </a>
+                        )}
+                        <p className="text-xs text-gray-400 mt-1">
+                          {gClip.message}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
     </main>
   );
 }
