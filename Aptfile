@@ -2,6 +2,8 @@ ffmpeg
 libavcodec-extra
 libavformat-dev
 libavutil-dev
+libavdevice-dev
+libavfilter-dev
 libswscale-dev
 libswresample-dev
 libx264-dev
