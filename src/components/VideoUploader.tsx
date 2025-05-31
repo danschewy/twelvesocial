@@ -5,9 +5,13 @@ import { useState, useRef, ChangeEvent, useEffect } from "react";
 interface VideoUploaderProps {
   // Callback with the actual videoId from Twelve Labs once processing is complete
   onVideoUploaded: (file: File, twelveLabsVideoId: string) => void;
+  videoPresent: boolean; // Added videoPresent prop
 }
 
-export default function VideoUploader({ onVideoUploaded }: VideoUploaderProps) {
+export default function VideoUploader({
+  onVideoUploaded,
+  videoPresent,
+}: VideoUploaderProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -162,45 +166,105 @@ export default function VideoUploader({ onVideoUploaded }: VideoUploaderProps) {
     fileInputRef.current?.click();
   };
 
-  return (
-    <div className="flex flex-col items-center w-full">
-      <div
-        className={`w-full h-64 border-2 border-dashed border-gray-400 rounded-lg flex flex-col items-center justify-center mb-4 transition-colors ${
-          isUploading || taskId
-            ? "cursor-not-allowed opacity-70"
-            : "cursor-pointer hover:border-gray-300"
-        }`}
-        onDrop={!(isUploading || taskId) ? handleDrop : undefined}
-        onDragOver={!(isUploading || taskId) ? handleDragOver : undefined}
-        onClick={openFileDialog}
-      >
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          accept="video/mp4,video/mov,video/quicktime,video/x-msvideo,video/x-flv,video/webm,video/mkv"
-          className="hidden"
-          disabled={isUploading || !!taskId}
-        />
-        {isUploading ? (
-          <p className="text-gray-300">Uploading to server...</p>
-        ) : taskId ? (
-          <p className="text-gray-300">
-            Processing video... (Status: {processingStatus || "Checking..."})
-          </p>
-        ) : videoPreviewUrl ? (
-          <p className="text-gray-300">Video selected: {videoFile?.name}</p>
-        ) : (
-          <p className="text-gray-400">
-            Drag & drop your video here, or click to select
-          </p>
+  // ----- RENDER LOGIC -----
+
+  // Hidden file input common to all states
+  const hiddenFileInput = (
+    <input
+      type="file"
+      ref={fileInputRef}
+      onChange={handleFileChange}
+      accept="video/mp4,video/mov,video/quicktime,video/x-msvideo,video/x-flv,video/webm,video/mkv"
+      className="hidden"
+      disabled={isUploading || !!taskId}
+    />
+  );
+
+  // If a video processing task is active for THIS uploader instance
+  // AND it's not yet in a final state (READY, FAILED, ERROR)
+  const isActiveTaskNotFinal =
+    taskId && !["READY", "FAILED", "ERROR"].includes(processingStatus || "");
+
+  if (isUploading || isActiveTaskNotFinal) {
+    return (
+      <div className="flex flex-col items-center w-full">
+        {hiddenFileInput}
+        {videoPreviewUrl && (
+          <div className="w-full max-w-md aspect-video bg-black rounded-lg overflow-hidden shadow-lg mb-4">
+            <video
+              src={videoPreviewUrl}
+              controls
+              className="w-full h-full"
+              autoPlay
+            >
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        )}
+        <p className="text-gray-300 mb-2">
+          {isUploading
+            ? "Uploading to server..."
+            : `Processing video (Status: ${
+                processingStatus || "Initializing..."
+              })`}
+        </p>
+        {(isUploading ||
+          (taskId &&
+            processingStatus !== "READY" &&
+            processingStatus !== "FAILED" &&
+            processingStatus !== "ERROR")) && (
+          <div className="w-full bg-gray-700 rounded-full h-2.5 mb-4">
+            <div
+              className="bg-blue-600 h-2.5 rounded-full animate-pulse"
+              style={{ width: "100%" }}
+            ></div>
+          </div>
+        )}
+        {taskId && (
+          <p className="text-xs text-gray-400 mb-2">Task ID: {taskId}</p>
+        )}
+        {errorMessage && (
+          <p className="text-red-400 mb-2 text-sm">Error: {errorMessage}</p>
         )}
       </div>
+    );
+  }
 
-      {errorMessage && (
-        <p className="text-red-400 mb-2 text-sm">Error: {errorMessage}</p>
-      )}
+  // If NO active task in THIS uploader (or it's in a final state like READY),
+  // and a video IS present globally (meaning previously uploaded and processed successfully):
+  if (videoPresent) {
+    return (
+      <div className="flex flex-col items-center w-full">
+        {hiddenFileInput}
+        <button
+          onClick={openFileDialog}
+          className="mb-4 px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+        >
+          Replace Video
+        </button>
+        {/* No preview of the *old* video here; UploadPage should handle that if needed. */}
+        {/* Show error message if an attempt to upload new video via button fails early */}
+        {errorMessage && (
+          <p className="text-red-400 mb-2 text-sm">Error: {errorMessage}</p>
+        )}
+      </div>
+    );
+  }
 
+  // Initial state: NO active task in THIS uploader, and NO video present globally:
+  return (
+    <div className="flex flex-col items-center w-full">
+      {hiddenFileInput}
+      <div
+        className="w-full h-64 border-2 border-dashed border-gray-400 rounded-lg flex flex-col items-center justify-center mb-4 cursor-pointer hover:border-gray-300 transition-colors"
+        onClick={openFileDialog}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+      >
+        <p className="text-gray-400">
+          Drag & drop your video here, or click to select
+        </p>
+      </div>
       {videoPreviewUrl && (
         <div className="w-full max-w-md aspect-video bg-black rounded-lg overflow-hidden shadow-lg mb-4">
           <video
@@ -213,20 +277,8 @@ export default function VideoUploader({ onVideoUploaded }: VideoUploaderProps) {
           </video>
         </div>
       )}
-      {(isUploading ||
-        (taskId &&
-          processingStatus !== "READY" &&
-          processingStatus !== "FAILED" &&
-          processingStatus !== "ERROR")) && (
-        <div className="w-full bg-gray-700 rounded-full h-2.5 mb-4">
-          <div
-            className="bg-blue-600 h-2.5 rounded-full animate-pulse"
-            style={{ width: "100%" }}
-          ></div>
-        </div>
-      )}
-      {taskId && (
-        <p className="text-xs text-gray-400 mb-2">Task ID: {taskId}</p>
+      {errorMessage && (
+        <p className="text-red-400 mb-2 text-sm">Error: {errorMessage}</p>
       )}
     </div>
   );

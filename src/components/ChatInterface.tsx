@@ -10,11 +10,30 @@ interface Message {
   timestamp: Date;
 }
 
-interface ChatInterfaceProps {
-  videoId: string | null; // videoId can be null initially
+interface SearchQueryItem {
+  // Copied from UploadPage for context, consider shared types file
+  id: string;
+  queryText: string;
+  searchOptions: string[];
 }
 
-export default function ChatInterface({ videoId }: ChatInterfaceProps) {
+interface SearchPromptData {
+  // Copied from UploadPage for context
+  searchQueries: SearchQueryItem[];
+  notesForUser: string;
+}
+
+interface ChatInterfaceProps {
+  videoId: string | null; // videoId can be null initially
+  sessionId: string; // Added sessionId prop
+  onSearchPromptGenerated: (data: SearchPromptData) => void; // Added prop
+}
+
+export default function ChatInterface({
+  videoId,
+  sessionId,
+  onSearchPromptGenerated,
+}: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -94,8 +113,8 @@ export default function ChatInterface({ videoId }: ChatInterfaceProps) {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Send the current messages array and videoId
-        body: JSON.stringify({ messages: newMessages, videoId }),
+        // Send the current messages array, sessionId, and videoId (if available)
+        body: JSON.stringify({ messages: newMessages, sessionId, videoId }),
       });
 
       if (!response.ok) {
@@ -107,6 +126,11 @@ export default function ChatInterface({ videoId }: ChatInterfaceProps) {
       const botResponseMessage: Message = data.reply;
 
       setMessages((prevMessages) => [...prevMessages, botResponseMessage]);
+
+      // If AI returned search prompt data, call the callback
+      if (data.searchPromptData) {
+        onSearchPromptGenerated(data.searchPromptData);
+      }
     } catch (error) {
       console.error("Error fetching chat response:", error);
       const errorText =
@@ -165,14 +189,16 @@ export default function ChatInterface({ videoId }: ChatInterfaceProps) {
             value={input}
             onChange={handleInputChange}
             placeholder={
-              videoId ? "Ask about your video..." : "Upload a video to chat..."
+              videoId
+                ? "Ask about your video..."
+                : "How can I help you create video clips?"
             }
-            disabled={isLoading || !videoId}
+            disabled={isLoading}
             className="flex-grow px-3 py-2 bg-gray-700 text-gray-200 border border-gray-600 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={isLoading || !videoId}
+            disabled={isLoading}
             className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-r-md hover:bg-blue-700 focus:outline-none focus:ring-blue-500 disabled:opacity-50"
           >
             {isLoading ? "Sending..." : "Send"}
