@@ -310,3 +310,129 @@ export const listProcessedVideosInIndex = async (
     throw new Error(errorMessage);
   }
 };
+
+// --- New Interface and Function for Searching Video Clips ---
+export interface SearchClipData {
+  score: number;
+  start: number; // in seconds
+  end: number; // in seconds
+  video_id: string;
+  confidence: "high" | "medium" | "low" | string; // string for future-proofing
+  thumbnail_url?: string;
+  // transcription?: string; // If available and needed
+}
+
+interface SearchAPIResponse {
+  data: SearchClipData[];
+  page_info: {
+    limit_per_page?: number; // older API version or diff endpoint might use this
+    page_limit?: number; // newer API version
+    offset?: number;
+    total_results?: number;
+    page?: number;
+    total_pages?: number;
+    next_page_token?: string;
+    page_expired_at?: string;
+  };
+  search_pool?: {
+    index_id: string;
+    total_count?: number;
+    total_duration?: number;
+  };
+  // Potentially other fields
+}
+
+export async function searchVideo(
+  indexId: string,
+  videoId: string, // To filter search to a specific video
+  query: string,
+  searchOptions: string[] = ["visual", "conversation"],
+  pageLimit: number = 50 // Maximize results per call
+): Promise<SearchClipData[]> {
+  if (!TWELVE_LABS_API_KEY) {
+    throw new Error("Twelve Labs API key is not configured.");
+  }
+  if (!indexId) {
+    throw new Error("Index ID is required for searching.");
+  }
+  if (!videoId) {
+    throw new Error("Video ID is required to scope the search.");
+  }
+  if (!query) {
+    throw new Error("Search query is required.");
+  }
+
+  const formData = new FormData();
+  formData.append("index_id", indexId);
+  formData.append("query_text", query);
+
+  // search_options needs to be appended for each option
+  if (searchOptions && searchOptions.length > 0) {
+    searchOptions.forEach((option) => {
+      formData.append("search_options", option);
+    });
+  } else {
+    // Append default if none provided, though API might have its own defaults
+    formData.append("search_options", "visual");
+    formData.append("search_options", "conversation");
+  }
+
+  formData.append("filter", JSON.stringify({ id: [videoId] }));
+  formData.append("page_limit", pageLimit.toString());
+  // Add other parameters as needed, like operator, group_by, sort_option, threshold
+  // formData.append("operator", "or"); // Example
+
+  console.log("Searching video with FormData. Fields appended:");
+  // Manually log form data fields for debugging if possible (FormData doesn't have a direct .entries() or .values() in all Node versions like browser FormData)
+  // For simple key-value pairs, you can iterate _streams if needed, but often logging the intent is enough.
+  console.log(`  index_id: ${indexId}`);
+  console.log(`  query_text: ${query}`);
+  searchOptions.forEach((opt) => console.log(`  search_options: ${opt}`));
+  console.log(`  filter: ${JSON.stringify({ id: [videoId] })}`);
+  console.log(`  page_limit: ${pageLimit}`);
+
+  try {
+    const response = await axios.post<SearchAPIResponse>(
+      `${TWELVE_LABS_BASE_URL}/search`,
+      formData, // Pass FormData object directly
+      {
+        headers: {
+          "x-api-key": TWELVE_LABS_API_KEY,
+          ...formData.getHeaders(), // Use headers from FormData for multipart
+        },
+        maxBodyLength: Infinity, // Good practice for FormData uploads
+        maxContentLength: Infinity,
+      }
+    );
+
+    if (response.status === 200 && response.data && response.data.data) {
+      console.log("Search successful. Clips found:", response.data.data.length);
+      return response.data.data;
+    } else {
+      // Handle non-200 responses that don't throw an error by default from axios
+      const errorDetail = response.data
+        ? JSON.stringify(response.data)
+        : response.statusText;
+      throw new Error(
+        `Failed to search video. Status: ${response.status}. Details: ${errorDetail}`
+      );
+    }
+  } catch (error: any) {
+    console.error("Error searching video in Twelve Labs:", error);
+    let errorMessage = "Error searching video in Twelve Labs.";
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        const apiError = error.response.data as any;
+        errorMessage = `Twelve Labs API Search Error: ${
+          apiError?.message || error.response.statusText || "Unknown error"
+        } (Status: ${error.response.status})`;
+      } else if (error.request) {
+        errorMessage =
+          "No response received from Twelve Labs API while searching video.";
+      } else {
+        errorMessage = `Error in setting up video search request: ${error.message}`;
+      }
+    }
+    throw new Error(errorMessage);
+  }
+}

@@ -4,7 +4,7 @@ import VideoUploader from "@/components/VideoUploader";
 import ChatInterface from "@/components/ChatInterface";
 import { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { VideoTask } from "@/lib/twelvelabs";
+import { VideoTask, SearchClipData } from "@/lib/twelvelabs";
 
 // Define types for the search prompt data from the AI
 interface SearchQueryItem {
@@ -45,6 +45,13 @@ export default function UploadPage() {
   );
   const videoRef = useRef<HTMLVideoElement>(null); // For HLS if we use hls.js later
 
+  // State for search results
+  const [searchResults, setSearchResults] = useState<SearchClipData[] | null>(
+    null
+  );
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
   useEffect(() => {
     // Generate a session ID when the component mounts
     setSessionId(uuidv4());
@@ -83,6 +90,14 @@ export default function UploadPage() {
     }
   }, [uploadedVideoFile]);
 
+  const resetSearchState = () => {
+    setAiSearchPrompts(null);
+    setEditableQueryText("");
+    setSearchResults(null);
+    setIsSearching(false);
+    setSearchError(null);
+  };
+
   const handleVideoUploaded = (file: File, twelveLabsVideoId: string) => {
     setUploadedVideoFile(file);
     setVideoId(twelveLabsVideoId);
@@ -92,8 +107,7 @@ export default function UploadPage() {
       "Newly uploaded video processed, Twelve Labs Video ID:",
       twelveLabsVideoId
     );
-    setAiSearchPrompts(null);
-    setEditableQueryText("");
+    resetSearchState();
   };
 
   const handleExistingVideoSelected = (videoTask: VideoTask) => {
@@ -111,8 +125,7 @@ export default function UploadPage() {
           "Selected existing video does not have an HLS stream URL for preview."
         );
       }
-      setAiSearchPrompts(null);
-      setEditableQueryText("");
+      resetSearchState();
     } else {
       console.warn(
         "Selected video task is not ready or has no video_id:",
@@ -132,6 +145,8 @@ export default function UploadPage() {
     } else {
       setEditableQueryText("");
     }
+    setSearchResults(null); // Clear previous results when new prompts are generated
+    setSearchError(null);
   };
 
   const handleSearchClips = async () => {
@@ -147,6 +162,10 @@ export default function UploadPage() {
       return;
     }
 
+    setIsSearching(true);
+    setSearchError(null);
+    setSearchResults(null);
+
     const queryToSearch = editableQueryText.trim();
     // Assuming we use the searchOptions from the first AI-generated query if available,
     // or default to general search options. This needs refinement for multiple queries.
@@ -161,7 +180,6 @@ export default function UploadPage() {
       options: searchOptions,
     });
 
-    // Placeholder for calling /api/search-clips
     try {
       const response = await fetch("/api/search-clips", {
         method: "POST",
@@ -173,14 +191,21 @@ export default function UploadPage() {
         throw new Error(errorData.details || "Failed to search clips");
       }
       const results = await response.json();
-      console.log("Search results:", results);
-      alert(
-        "Clips search initiated! Check console for results (actual display pending)."
-      );
-      // TODO: Process and display these results
-    } catch (error) {
+      console.log("Search results received:", results);
+      if (results.data) {
+        setSearchResults(results.data);
+      } else {
+        setSearchResults([]); // Should ideally not happen if API is consistent
+        console.warn("Search API returned success but no data field.");
+      }
+    } catch (error: any) {
       console.error("Failed to search clips:", error);
-      alert("Error searching clips: " + (error as Error).message);
+      setSearchError(
+        error.message || "An unknown error occurred during search."
+      );
+      setSearchResults([]); // Ensure results are cleared on error
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -313,10 +338,10 @@ export default function UploadPage() {
                       </div>
                       <button
                         onClick={handleSearchClips}
-                        disabled={!editableQueryText.trim()}
+                        disabled={!editableQueryText.trim() || isSearching}
                         className="w-full px-4 py-2.5 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 transition-colors"
                       >
-                        Search Clips
+                        {isSearching ? "Searching..." : "Search Clips"}
                       </button>
                     </div>
                   </>
@@ -330,6 +355,59 @@ export default function UploadPage() {
                       Suggested search queries will appear here once generated.
                     </p>
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Search Results Section */}
+            {(isSearching || searchError || searchResults) && videoId && (
+              <div className="mt-6 pt-6 border-t border-gray-700">
+                <h2 className="text-2xl font-semibold mb-4">4. Found Clips</h2>
+                {isSearching && (
+                  <p className="text-center text-gray-300">Loading clips...</p>
+                )}
+                {searchError && (
+                  <p className="text-red-400 text-center">
+                    Error finding clips: {searchError}
+                  </p>
+                )}
+                {searchResults && !isSearching && (
+                  <>
+                    {searchResults.length === 0 && (
+                      <p className="text-gray-400 text-center">
+                        No clips found matching your query.
+                      </p>
+                    )}
+                    {searchResults.length > 0 && (
+                      <div className="space-y-3 max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                        {searchResults.map((clip, index) => (
+                          <div
+                            key={index}
+                            className="bg-gray-700/50 p-3 rounded-md flex gap-3 items-start"
+                          >
+                            {clip.thumbnail_url && (
+                              <img
+                                src={clip.thumbnail_url}
+                                alt={`Clip thumbnail ${index + 1}`}
+                                className="w-24 h-14 object-cover rounded flex-shrink-0"
+                              />
+                            )}
+                            <div className="flex-grow">
+                              <p className="text-sm font-semibold">
+                                Clip {index + 1}: {clip.start.toFixed(2)}s -{" "}
+                                {clip.end.toFixed(2)}s
+                              </p>
+                              <p className="text-xs text-gray-300">
+                                Score: {clip.score.toFixed(2)} | Confidence:{" "}
+                                {clip.confidence}
+                              </p>
+                              {/* TODO: Add selection checkbox/button here */}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
