@@ -348,8 +348,8 @@ export default function UploadPage() {
                 ) : (
                   <div className="p-4 text-center text-gray-400 border border-dashed border-gray-600 rounded-md">
                     <p>
-                      Chat with the AI to define what you're looking for in "
-                      {currentVideoName || "your video"}".
+                      Chat with the AI to define what you&apos;re looking for in
+                      "{currentVideoName || "your video"}".
                     </p>
                     <p className="text-sm">
                       Suggested search queries will appear here once generated.
