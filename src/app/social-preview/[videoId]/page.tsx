@@ -222,7 +222,7 @@ export default function SocialPreviewPage() {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-purple-500/5 to-blue-500/5 rounded-full blur-3xl animate-spin-slow"></div>
       </div>
 
-      <div className="relative z-10 container mx-auto px-6 py-8 max-w-7xl">
+      <div className="relative z-10 container mx-auto px-6 py-8 max-w-4xl">
         {/* Enhanced Header */}
         <div className="mb-12">
           <button
@@ -245,266 +245,260 @@ export default function SocialPreviewPage() {
             <h2 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
               Preview
             </h2>
-            <p className="text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
               Your AI-crafted video clip and social media post, ready to captivate your audience
             </p>
           </div>
         </div>
 
-        {/* Enhanced Main Content Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        {/* Enhanced Main Content - Vertical Stack */}
+        <div className="space-y-8">
           {/* Video Clip Section - Enhanced */}
-          <div className="xl:col-span-2 space-y-8">
-            {/* Video Player Card */}
-            <div className="group bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-purple-500/30 transition-all duration-500 hover:shadow-2xl hover:shadow-purple-500/10">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center">
-                  <span className="text-2xl">🎬</span>
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">Generated Clip</h2>
-                  <p className="text-purple-200">Your AI-crafted video masterpiece</p>
-                </div>
+          <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-purple-500/30 transition-all duration-500 hover:shadow-2xl hover:shadow-purple-500/10">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center">
+                <span className="text-2xl">🎬</span>
               </div>
-              
-              {clipUrl ? (
-                <div className="space-y-6">
-                  <div className="relative group/video">
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-2xl blur-xl group-hover/video:blur-2xl transition-all duration-300"></div>
-                    <video
-                      id="social-preview-player"
-                      src={clipUrl}
-                      controls
-                      playsInline
-                      className="relative w-full aspect-video bg-black rounded-2xl shadow-2xl border border-white/10 hover:border-purple-500/30 transition-all duration-300"
-                      onError={(e) => {
-                        console.error("Error playing clip:", e);
-                        setError("Could not play the video clip. The URL might be invalid or the format not supported.");
-                      }}
-                    />
+              <div>
+                <h2 className="text-2xl font-bold text-white">Generated Clip</h2>
+                <p className="text-purple-200">Your AI-crafted video masterpiece</p>
+              </div>
+            </div>
+            
+            {clipUrl ? (
+              <div className="space-y-6">
+                <div className="relative group/video">
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-2xl blur-xl group-hover/video:blur-2xl transition-all duration-300"></div>
+                  <video
+                    id="social-preview-player"
+                    src={clipUrl}
+                    controls
+                    playsInline
+                    className="relative w-full aspect-video bg-black rounded-2xl shadow-2xl border border-white/10 hover:border-purple-500/30 transition-all duration-300"
+                    onError={(e) => {
+                      console.error("Error playing clip:", e);
+                      setError("Could not play the video clip. The URL might be invalid or the format not supported.");
+                    }}
+                  />
+                </div>
+                
+                <a
+                  href={clipUrl}
+                  download
+                  className="group/download inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white rounded-2xl font-bold transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-green-500/25 hover:scale-105"
+                >
+                  <span className="text-xl group-hover/download:animate-bounce">📥</span> 
+                  <span>Download Clip</span>
+                </a>
+              </div>
+            ) : (
+              <div className="text-center py-16 text-gray-400">
+                <div className="text-6xl mb-6 opacity-50">📹</div>
+                <p className="text-lg">Video clip URL not provided. Preview not available.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Social Post Card - Enhanced */}
+          <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-pink-500/30 transition-all duration-500">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center">
+                <span className="text-2xl">📱</span>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white">Social Media Post</h2>
+                <p className="text-pink-200">Ready to share</p>
+              </div>
+            </div>
+            
+            {isLoadingPost && (
+              <div className="text-center py-16">
+                <div className="relative">
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500/20 border-t-purple-500 mx-auto mb-6"></div>
+                  <div className="absolute inset-0 rounded-full bg-purple-500/10 blur-xl animate-pulse"></div>
+                </div>
+                <p className="text-gray-300 text-lg">Crafting your perfect post...</p>
+              </div>
+            )}
+
+            {socialPost && (
+              <div className="space-y-6">
+                {/* Enhanced Social Post Preview */}
+                <div className="bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-blue-500/10 border border-purple-500/20 rounded-2xl p-6 hover:border-purple-500/40 transition-all duration-300">
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                      AI
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-white text-lg">AI Generated Post</p>
+                      <p className="text-purple-200 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                        Just now
+                      </p>
+                    </div>
                   </div>
                   
-                  <a
-                    href={clipUrl}
-                    download
-                    className="group/download inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white rounded-2xl font-bold transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-green-500/25 hover:scale-105"
-                  >
-                    <span className="text-xl group-hover/download:animate-bounce">📥</span> 
-                    <span>Download Clip</span>
-                  </a>
+                  <p className="text-white leading-relaxed text-lg whitespace-pre-wrap mb-6">
+                    {socialPost.refinedText}
+                  </p>
+                  
+                  <div className="flex items-center gap-6 text-gray-300">
+                    <button className="flex items-center gap-2 hover:text-blue-400 transition-colors">
+                      <span className="text-xl">💬</span> <span className="font-medium">0</span>
+                    </button>
+                    <button className="flex items-center gap-2 hover:text-green-400 transition-colors">
+                      <span className="text-xl">🔄</span> <span className="font-medium">0</span>
+                    </button>
+                    <button className="flex items-center gap-2 hover:text-red-400 transition-colors">
+                      <span className="text-xl">❤️</span> <span className="font-medium">0</span>
+                    </button>
+                    <button className="flex items-center gap-2 hover:text-purple-400 transition-colors ml-auto">
+                      <span className="text-xl">📤</span>
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-center py-16 text-gray-400">
-                  <div className="text-6xl mb-6 opacity-50">📹</div>
-                  <p className="text-lg">Video clip URL not provided. Preview not available.</p>
-                </div>
-              )}
-            </div>
 
-            {/* Video Summary Card - Enhanced */}
-            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-blue-500/30 transition-all duration-500">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center">
-                  <span className="text-2xl">📝</span>
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-white">Video Summary</h3>
-                  <p className="text-blue-200">AI-generated insights</p>
+                {/* Enhanced Copy Button */}
+                <button
+                  onClick={() => handleCopyToClipboard(socialPost.refinedText)}
+                  className={`group w-full flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-bold transition-all duration-300 shadow-lg hover:shadow-xl ${
+                    copySuccess
+                      ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-green-500/25"
+                      : "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white shadow-purple-500/25 hover:scale-105"
+                  }`}
+                >
+                  {copySuccess ? (
+                    <>
+                      <span className="text-xl animate-bounce">✅</span> 
+                      <span>Copied to Clipboard!</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xl group-hover:scale-110 transition-transform">📋</span> 
+                      <span>Copy Post</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {!isLoadingPost && !socialPost && !error && videoSummary && (
+              <div className="text-center py-16 text-gray-400">
+                <div className="text-6xl mb-6 opacity-50">📱</div>
+                <p className="text-lg">Social post will appear here once generated.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Video Summary Card - Enhanced */}
+          <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-blue-500/30 transition-all duration-500">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center">
+                <span className="text-2xl">📝</span>
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-white">Video Summary</h3>
+                <p className="text-blue-200">AI-generated insights</p>
+              </div>
+            </div>
+            
+            {videoSummary ? (
+              <div className="bg-gradient-to-br from-white/5 to-white/10 rounded-2xl p-6 border border-white/10">
+                <p className="text-gray-100 leading-relaxed text-lg whitespace-pre-wrap">
+                  {isExpanded 
+                    ? videoSummary.summary 
+                    : getTruncatedSummary(videoSummary.summary)
+                  }
+                </p>
+                {videoSummary.summary.split(' ').length > 60 && (
+                  <button
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500/20 to-purple-500/20 hover:from-blue-500/30 hover:to-purple-500/30 border border-blue-500/30 rounded-xl text-blue-200 hover:text-white transition-all duration-300 font-medium"
+                  >
+                    {isExpanded ? '📖 Show Less' : '📚 Read More'}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-400">
+                <div className="text-4xl mb-4 opacity-50">📄</div>
+                <p>Summary not available.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Create More Clips Card - Enhanced */}
+          <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-indigo-500/30 transition-all duration-500">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center">
+                <span className="text-2xl">🤖</span>
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-white">Create More Clips</h3>
+                <p className="text-indigo-200">AI-powered clip generation</p>
+              </div>
+            </div>
+            
+            <div className="space-y-6">
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  placeholder="Describe your perfect clip..."
+                  className="flex-1 px-6 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent backdrop-blur-xl transition-all duration-300"
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!chatMessage.trim()}
+                  className="px-6 py-4 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white rounded-2xl font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 shadow-lg hover:shadow-purple-500/25"
+                >
+                  <span className="text-xl">🚀</span>
+                </button>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-400 mb-4 font-medium">✨ Quick suggestions:</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {suggestedPrompts.map((prompt, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handlePromptClick(prompt)}
+                      className="group px-4 py-3 bg-gradient-to-r from-white/10 to-white/5 hover:from-purple-500/20 hover:to-indigo-500/20 border border-white/20 hover:border-purple-500/30 rounded-xl text-sm text-white transition-all duration-300 hover:scale-105 font-medium"
+                    >
+                      <span className="group-hover:animate-pulse">✨</span> {prompt}
+                    </button>
+                  ))}
                 </div>
               </div>
-              
-              {videoSummary ? (
-                <div className="bg-gradient-to-br from-white/5 to-white/10 rounded-2xl p-6 border border-white/10">
-                  <p className="text-gray-100 leading-relaxed text-lg whitespace-pre-wrap">
-                    {isExpanded 
-                      ? videoSummary.summary 
-                      : getTruncatedSummary(videoSummary.summary)
-                    }
-                  </p>
-                  {videoSummary.summary.split(' ').length > 60 && (
-                    <button
-                      onClick={() => setIsExpanded(!isExpanded)}
-                      className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500/20 to-purple-500/20 hover:from-blue-500/30 hover:to-purple-500/30 border border-blue-500/30 rounded-xl text-blue-200 hover:text-white transition-all duration-300 font-medium"
-                    >
-                      {isExpanded ? '📖 Show Less' : '📚 Read More'}
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-gray-400">
-                  <div className="text-4xl mb-4 opacity-50">📄</div>
-                  <p>Summary not available.</p>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Right Sidebar - Enhanced */}
-          <div className="space-y-8">
-            {/* Social Post Card - Enhanced */}
-            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-pink-500/30 transition-all duration-500">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center">
-                  <span className="text-2xl">📱</span>
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">Social Media Post</h2>
-                  <p className="text-pink-200">Ready to share</p>
-                </div>
+          {/* Enhanced Tips Section */}
+          <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-yellow-500/30 transition-all duration-500">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-2xl flex items-center justify-center">
+                <span className="text-2xl">💡</span>
               </div>
-              
-              {isLoadingPost && (
-                <div className="text-center py-16">
-                  <div className="relative">
-                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500/20 border-t-purple-500 mx-auto mb-6"></div>
-                    <div className="absolute inset-0 rounded-full bg-purple-500/10 blur-xl animate-pulse"></div>
-                  </div>
-                  <p className="text-gray-300 text-lg">Crafting your perfect post...</p>
-                </div>
-              )}
-
-              {socialPost && (
-                <div className="space-y-6">
-                  {/* Enhanced Social Post Preview */}
-                  <div className="bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-blue-500/10 border border-purple-500/20 rounded-2xl p-6 hover:border-purple-500/40 transition-all duration-300">
-                    <div className="flex items-start gap-4 mb-6">
-                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                        AI
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-white text-lg">AI Generated Post</p>
-                        <p className="text-purple-200 flex items-center gap-2">
-                          <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                          Just now
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <p className="text-white leading-relaxed text-lg whitespace-pre-wrap mb-6">
-                      {socialPost.refinedText}
-                    </p>
-                    
-                    <div className="flex items-center gap-6 text-gray-300">
-                      <button className="flex items-center gap-2 hover:text-blue-400 transition-colors">
-                        <span className="text-xl">💬</span> <span className="font-medium">0</span>
-                      </button>
-                      <button className="flex items-center gap-2 hover:text-green-400 transition-colors">
-                        <span className="text-xl">🔄</span> <span className="font-medium">0</span>
-                      </button>
-                      <button className="flex items-center gap-2 hover:text-red-400 transition-colors">
-                        <span className="text-xl">❤️</span> <span className="font-medium">0</span>
-                      </button>
-                      <button className="flex items-center gap-2 hover:text-purple-400 transition-colors ml-auto">
-                        <span className="text-xl">📤</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Enhanced Copy Button */}
-                  <button
-                    onClick={() => handleCopyToClipboard(socialPost.refinedText)}
-                    className={`group w-full flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-bold transition-all duration-300 shadow-lg hover:shadow-xl ${
-                      copySuccess
-                        ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-green-500/25"
-                        : "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white shadow-purple-500/25 hover:scale-105"
-                    }`}
-                  >
-                    {copySuccess ? (
-                      <>
-                        <span className="text-xl animate-bounce">✅</span> 
-                        <span>Copied to Clipboard!</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-xl group-hover:scale-110 transition-transform">📋</span> 
-                        <span>Copy Post</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-
-              {!isLoadingPost && !socialPost && !error && videoSummary && (
-                <div className="text-center py-16 text-gray-400">
-                  <div className="text-6xl mb-6 opacity-50">📱</div>
-                  <p className="text-lg">Social post will appear here once generated.</p>
-                </div>
-              )}
-            </div>
-
-            {/* Create More Clips Card - Enhanced */}
-            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-indigo-500/30 transition-all duration-500">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center">
-                  <span className="text-2xl">🤖</span>
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-white">Create More Clips</h3>
-                  <p className="text-indigo-200">AI-powered clip generation</p>
-                </div>
-              </div>
-              
-              <div className="space-y-6">
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="Describe your perfect clip..."
-                    className="flex-1 px-6 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent backdrop-blur-xl transition-all duration-300"
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={!chatMessage.trim()}
-                    className="px-6 py-4 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white rounded-2xl font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 shadow-lg hover:shadow-purple-500/25"
-                  >
-                    <span className="text-xl">🚀</span>
-                  </button>
-                </div>
-
-                <div>
-                  <p className="text-sm text-gray-400 mb-4 font-medium">✨ Quick suggestions:</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {suggestedPrompts.map((prompt, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handlePromptClick(prompt)}
-                        className="group px-4 py-3 bg-gradient-to-r from-white/10 to-white/5 hover:from-purple-500/20 hover:to-indigo-500/20 border border-white/20 hover:border-purple-500/30 rounded-xl text-sm text-white transition-all duration-300 hover:scale-105 font-medium"
-                      >
-                        <span className="group-hover:animate-pulse">✨</span> {prompt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Pro Tips</h3>
+                <p className="text-yellow-200">Maximize your reach</p>
               </div>
             </div>
-
-            {/* Enhanced Tips Section */}
-            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-yellow-500/30 transition-all duration-500">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-2xl flex items-center justify-center">
-                  <span className="text-2xl">💡</span>
+            
+            <div className="space-y-4">
+              {[
+                { icon: "⏰", text: "Post during peak engagement hours for your audience" },
+                { icon: "🏷️", text: "Consider adding platform-specific hashtags" },
+                { icon: "💬", text: "Engage with comments to boost visibility" },
+                { icon: "🌐", text: "Cross-post to multiple platforms for maximum reach" }
+              ].map((tip, index) => (
+                <div key={index} className="flex items-start gap-4 p-4 bg-white/5 rounded-xl border border-white/10 hover:border-yellow-500/20 transition-all duration-300 group">
+                  <span className="text-2xl group-hover:scale-110 transition-transform">{tip.icon}</span>
+                  <p className="text-gray-200 leading-relaxed">{tip.text}</p>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">Pro Tips</h3>
-                  <p className="text-yellow-200">Maximize your reach</p>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                {[
-                  { icon: "⏰", text: "Post during peak engagement hours for your audience" },
-                  { icon: "🏷️", text: "Consider adding platform-specific hashtags" },
-                  { icon: "💬", text: "Engage with comments to boost visibility" },
-                  { icon: "🌐", text: "Cross-post to multiple platforms for maximum reach" }
-                ].map((tip, index) => (
-                  <div key={index} className="flex items-start gap-4 p-4 bg-white/5 rounded-xl border border-white/10 hover:border-yellow-500/20 transition-all duration-300 group">
-                    <span className="text-2xl group-hover:scale-110 transition-transform">{tip.icon}</span>
-                    <p className="text-gray-200 leading-relaxed">{tip.text}</p>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
         </div>
