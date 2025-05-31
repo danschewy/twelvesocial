@@ -60,7 +60,6 @@ export async function GET(request: Request) {
       sortBy,
       sortOption
     );
-
     return NextResponse.json(result, { status: 200 });
   } catch (error: unknown) {
     console.error("Error in /api/list-videos:", error);

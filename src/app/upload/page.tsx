@@ -257,23 +257,70 @@ export default function UploadPage() {
     }
   };
 
-  const handleExistingVideoSelected = (videoTask: VideoTask) => {
+  const handleExistingVideoSelected = async (videoTask: VideoTask) => {
     if (videoTask.video_id && videoTask.status === "ready") {
       setVideoId(videoTask.video_id);
-      console.log(videoTask);
       setSelectedExistingVideo(videoTask);
-      setUploadedVideoFile(null); // Clear new upload state, which clears localPreviewUrl via useEffect
-      setSelectedVideoHlsUrl(videoTask.hls?.video_url || null);
+      setUploadedVideoFile(null);
+      setSelectedVideoHlsUrl(null); // Clear any previous HLS URL immediately
+      resetSearchState();
       console.log(
         "Existing video selected, Twelve Labs Video ID:",
         videoTask.video_id
       );
-      if (!videoTask.hls?.video_url) {
-        console.warn(
-          "Selected existing video does not have an HLS stream URL for preview."
+      console.log(
+        "Attempting to fetch HLS stream for selected existing video..."
+      );
+      setIsFetchingVideoDetails(true); // Reuse existing loading state
+      try {
+        const response = await fetch(
+          `/api/video-details/${videoTask.video_id}`
         );
+        if (!response.ok) {
+          let errorMsg = "Failed to fetch video details for selected video.";
+          try {
+            const errorData = await response.json();
+            errorMsg = errorData.details || errorData.message || errorMsg;
+          } catch (e) {
+            errorMsg = response.statusText || errorMsg;
+          }
+          throw new Error(errorMsg);
+        }
+        const details: VideoDetailsType = await response.json();
+        if (details.hls?.video_url) {
+          setSelectedVideoHlsUrl(details.hls.video_url);
+          console.log(
+            "HLS stream URL fetched and set for selected existing video:",
+            details.hls.video_url
+          );
+        } else {
+          console.warn(
+            "HLS stream URL not found in details for selected existing video."
+          );
+          // Potentially set an error or notification for the user here if preview is expected
+          setErrorLoadingVideos(
+            `Video selected, but no HLS stream is available for preview (${
+              videoTask.system_metadata?.filename || videoTask.video_id
+            }).`
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Error fetching video details for selected existing video:",
+          error
+        );
+        if (error instanceof Error) {
+          setErrorLoadingVideos(
+            `Could not load HLS stream for preview: ${error.message}`
+          );
+        } else {
+          setErrorLoadingVideos(
+            "An unknown error occurred while fetching HLS stream for selected video."
+          );
+        }
+      } finally {
+        setIsFetchingVideoDetails(false);
       }
-      resetSearchState();
     } else {
       console.warn(
         "Selected video task is not ready or has no video_id:",
