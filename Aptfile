@@ -1,9 +1,3 @@
 ffmpeg
-libavcodec-extra
-libavfilter-extra
-libavformat-extra
-libswresample-extra
-libx264-dev
-libx265-dev
 libvpx7
 libpulse0
