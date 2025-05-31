@@ -153,7 +153,7 @@ export default function UploadPage() {
         });
         hls.on(Hls.Events.ERROR, function (event, data) {
           // Extract only relevant error properties to avoid circular references
-          // Add null checks to prevent runtime errors
+          // Add comprehensive null checks to prevent runtime errors
           const errorInfo = {
             type: data?.type || 'unknown',
             details: data?.details || 'no details',
@@ -162,8 +162,8 @@ export default function UploadPage() {
             level: data?.level || 'unknown level',
             url: data?.url || 'no url',
             response: data?.response ? {
-              code: data.response.code || 'no code',
-              text: data.response.text || 'no text'
+              code: data.response?.code || 'no code',
+              text: data.response?.text || 'no text'
             } : undefined
           };
           console.error("HLS.js error:", errorInfo);
