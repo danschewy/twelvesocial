@@ -13,12 +13,19 @@ interface ListVideosQuery {
   sortOption?: string;
 }
 
+// Define a type for the keys of ListVideosQuery to ensure type safety
+type ListVideosQueryKeys = keyof ListVideosQuery;
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const query: ListVideosQuery = {};
+  const query: Partial<ListVideosQuery> = {}; // Use Partial for building the query object
   searchParams.forEach((value, key) => {
-    // Type assertion, assuming keys are one of ListVideosQuery
-    (query as any)[key] = value;
+    const queryKey = key as ListVideosQueryKeys;
+    if (key in query) {
+      // This check is a bit redundant if keys are unique, but good for safety
+      // Potentially handle duplicate keys if necessary, though typically they overwrite or append
+    }
+    query[queryKey] = value;
   });
 
   try {
@@ -55,10 +62,14 @@ export async function GET(request: Request) {
     );
 
     return NextResponse.json(result, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in /api/list-videos:", error);
+    let errorMessage = "Failed to list videos.";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
     return NextResponse.json(
-      { message: "Failed to list videos.", details: error.message },
+      { message: "Failed to list videos.", details: errorMessage },
       { status: 500 }
     );
   }

@@ -46,10 +46,14 @@ export async function POST(request: Request) {
     );
 
     return NextResponse.json({ data: clips }, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in /api/search-clips:", error);
+    let errorMessage = "Failed to search clips.";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
     return NextResponse.json(
-      { message: "Failed to search clips.", details: error.message },
+      { message: "Failed to search clips.", details: errorMessage },
       { status: 500 }
     );
   }

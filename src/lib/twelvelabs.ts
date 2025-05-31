@@ -36,6 +36,13 @@ interface TwelveLabsError extends Error {
   isAxiosError?: boolean; // For differentiating axios errors
 }
 
+// Define TwelveLabsApiErrorData for more specific typing of error responses
+interface TwelveLabsApiErrorData {
+  // More generic error data interface
+  message?: string;
+  [key: string]: unknown; // Allow other properties
+}
+
 /**
  * Retrieves the target Twelve Labs index ID.
  * Prefers a specific ID if provided, otherwise defaults to the environment variable `TWELVE_LABS_INDEX_ID`.
@@ -282,7 +289,7 @@ export const listProcessedVideosInIndex = async (
     if (response.status === 200) {
       return response.data;
     } else {
-      const errorData = response.data as any;
+      const errorData = response.data as unknown as TwelveLabsApiErrorData;
       console.error("Failed to list videos from Twelve Labs", errorData);
       throw new Error(
         `Failed to list videos: ${
@@ -290,21 +297,23 @@ export const listProcessedVideosInIndex = async (
         } (Status: ${response.status})`
       );
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error listing videos from Twelve Labs:", error);
     let errorMessage = "Error listing videos from Twelve Labs.";
-    if (error.response) {
-      console.error("Error response data:", error.response.data);
-      const apiError = error.response.data as any;
-      errorMessage = `Twelve Labs API Error: ${
-        apiError?.message || error.response.statusText || "Unknown error"
-      } (Status: ${error.response.status})`;
-    } else if (error.request) {
-      console.error("Error request:", error.request);
-      errorMessage =
-        "No response received from Twelve Labs API while listing videos.";
-    } else {
-      errorMessage = `Error in setting up list videos request: ${error.message}`;
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        console.error("Error response data:", error.response.data);
+        const apiError = error.response.data as TwelveLabsApiErrorData;
+        errorMessage = `Twelve Labs API Error: ${
+          apiError?.message || error.response.statusText || "Unknown error"
+        } (Status: ${error.response.status})`;
+      } else if (error.request) {
+        console.error("Error request:", error.request);
+        errorMessage =
+          "No response received from Twelve Labs API while listing videos.";
+      } else {
+        errorMessage = `Error in setting up list videos request: ${error.message}`;
+      }
     }
     throw new Error(errorMessage);
   }
@@ -409,19 +418,33 @@ export async function searchVideo(
       return response.data.data;
     } else {
       // Handle non-200 responses that don't throw an error by default from axios
-      const errorDetail = response.data
-        ? JSON.stringify(response.data)
-        : response.statusText;
+      const errorDetailRaw = response.data as unknown;
+      let message = response.statusText;
+      if (
+        typeof errorDetailRaw === "object" &&
+        errorDetailRaw !== null &&
+        "message" in errorDetailRaw &&
+        typeof errorDetailRaw.message === "string"
+      ) {
+        message = (errorDetailRaw as TwelveLabsApiErrorData).message || message;
+      } else if (typeof errorDetailRaw === "string") {
+        message = errorDetailRaw;
+      }
+      const errorDetailString =
+        typeof errorDetailRaw === "string"
+          ? errorDetailRaw
+          : JSON.stringify(errorDetailRaw);
+
       throw new Error(
-        `Failed to search video. Status: ${response.status}. Details: ${errorDetail}`
+        `Failed to search video. Status: ${response.status}. Details: ${message} (Raw: ${errorDetailString})`
       );
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error searching video in Twelve Labs:", error);
     let errorMessage = "Error searching video in Twelve Labs.";
     if (axios.isAxiosError(error)) {
       if (error.response) {
-        const apiError = error.response.data as any;
+        const apiError = error.response.data as TwelveLabsApiErrorData;
         errorMessage = `Twelve Labs API Search Error: ${
           apiError?.message || error.response.statusText || "Unknown error"
         } (Status: ${error.response.status})`;

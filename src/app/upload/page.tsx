@@ -5,6 +5,7 @@ import ChatInterface from "@/components/ChatInterface";
 import { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { VideoTask, SearchClipData } from "@/lib/twelvelabs";
+import Image from "next/image"; // Import Next.js Image component
 
 // Define types for the search prompt data from the AI
 interface SearchQueryItem {
@@ -68,9 +69,15 @@ export default function UploadPage() {
         }
         const data = await response.json();
         setIndexedVideos(data.data);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error fetching indexed videos:", error);
-        setErrorLoadingVideos(error.message);
+        if (error instanceof Error) {
+          setErrorLoadingVideos(error.message);
+        } else {
+          setErrorLoadingVideos(
+            "An unknown error occurred while fetching videos."
+          );
+        }
       } finally {
         setIsLoadingVideos(false);
       }
@@ -198,11 +205,13 @@ export default function UploadPage() {
         setSearchResults([]); // Should ideally not happen if API is consistent
         console.warn("Search API returned success but no data field.");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to search clips:", error);
-      setSearchError(
-        error.message || "An unknown error occurred during search."
-      );
+      if (error instanceof Error) {
+        setSearchError(error.message);
+      } else {
+        setSearchError("An unknown error occurred during search.");
+      }
       setSearchResults([]); // Ensure results are cleared on error
     } finally {
       setIsSearching(false);
@@ -261,10 +270,13 @@ export default function UploadPage() {
                         }`}
                       >
                         {videoTask.hls?.thumbnail_urls?.[0] && (
-                          <img
+                          <Image
                             src={videoTask.hls.thumbnail_urls[0]}
                             alt="Thumbnail"
-                            className="w-16 h-10 object-cover rounded flex-shrink-0"
+                            width={64} // w-16 equivalent for 4px base = 16*4 = 64px. Assuming 1rem = 16px, w-16 = 4rem = 64px.
+                            height={40} // h-10 equivalent = 10*4 = 40px
+                            className="object-cover rounded flex-shrink-0"
+                            unoptimized={true} // Add this if you haven't configured remote patterns yet, or remove if configured
                           />
                         )}
                         <div className="flex-grow overflow-hidden">
@@ -349,7 +361,7 @@ export default function UploadPage() {
                   <div className="p-4 text-center text-gray-400 border border-dashed border-gray-600 rounded-md">
                     <p>
                       Chat with the AI to define what you&apos;re looking for in
-                      "{currentVideoName || "your video"}".
+                      &quot;{currentVideoName || "your video"}&quot;.
                     </p>
                     <p className="text-sm">
                       Suggested search queries will appear here once generated.
@@ -386,10 +398,13 @@ export default function UploadPage() {
                             className="bg-gray-700/50 p-3 rounded-md flex gap-3 items-start"
                           >
                             {clip.thumbnail_url && (
-                              <img
+                              <Image
                                 src={clip.thumbnail_url}
                                 alt={`Clip thumbnail ${index + 1}`}
-                                className="w-24 h-14 object-cover rounded flex-shrink-0"
+                                width={96} // w-24 equivalent = 24*4 = 96px
+                                height={56} // h-14 equivalent = 14*4 = 56px
+                                className="object-cover rounded flex-shrink-0"
+                                unoptimized={true} // Add this if you haven't configured remote patterns yet, or remove if configured
                               />
                             )}
                             <div className="flex-grow">
