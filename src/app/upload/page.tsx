@@ -11,6 +11,7 @@ import {
 } from "@/lib/twelvelabs";
 import Image from "next/image"; // Import Next.js Image component
 import Hls from "hls.js"; // Import Hls.js
+import Link from "next/link"; // Import Link component
 
 // Define types for the search prompt data from the AI
 interface SearchQueryItem {
@@ -849,13 +850,32 @@ export default function UploadPage() {
                             Error: {gClip.error}
                           </p>
                         ) : (
-                          <a
-                            href={gClip.downloadUrl}
-                            download
-                            className="mt-1 inline-block px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
-                          >
-                            Download Clip
-                          </a>
+                          <div className="mt-2 flex space-x-2">
+                            <a
+                              href={gClip.downloadUrl}
+                              download
+                              className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+                            >
+                              Download Clip
+                            </a>
+                            {videoId && gClip.downloadUrl && (
+                              <Link
+                                href={`/social-preview/${videoId}?clipUrl=${encodeURIComponent(
+                                  gClip.downloadUrl
+                                )}`}
+                                passHref
+                                legacyBehavior
+                              >
+                                <a
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                                >
+                                  Preview Social Post
+                                </a>
+                              </Link>
+                            )}
+                          </div>
                         )}
                         <p className="text-xs text-gray-400 mt-1">
                           {gClip.message}

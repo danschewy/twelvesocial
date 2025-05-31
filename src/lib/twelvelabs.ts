@@ -94,3 +94,16 @@ export interface VideoDetails
 // Type for the Task object from the SDK, if needed for getVideoProcessingStatus responses through an API route
 // This ensures the client knows the shape of the Task object if it needs to consume it.
 export type TwelveLabsSDKTask = Task;
+
+export interface TwelveLabsErrorData {
+  message?: string; // Common field for error messages
+  detail?: string | object; // More detailed error information
+  // Add other common error fields if known, e.g., code, type
+}
+
+// Type for the video summary data from /v1.3/summarize endpoint
+export interface VideoSummaryData {
+  id: string; // The ID of the summarization job
+  summary: string; // The generated summary text
+  // usage?: { output_tokens: number }; // Optional: if you want to include usage stats
+}

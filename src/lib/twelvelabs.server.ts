@@ -8,6 +8,8 @@ import type {
   TwelveLabsApiErrorData, // Assuming this can be shared or defined here
   TwelveLabsErrorResponseData, // Assuming this can be shared or defined here
   TwelveLabsError, // Assuming this can be shared or defined here
+  TwelveLabsErrorData, // Ensure this is imported or defined
+  VideoSummaryData, // Import the new type
 } from "./twelvelabs.ts"; // Will import shared types
 
 // Constants
@@ -352,5 +354,93 @@ export async function getVideoDetails(
         }`;
     } else if (error instanceof Error) errorMessage = error.message;
     throw new Error(errorMessage);
+  }
+}
+
+// Function to generate video summary using /v1.3/summarize endpoint
+export async function generateVideoSummary(
+  videoId: string,
+  prompt?: string, // Optional prompt for summarization
+  temperature?: number // Optional temperature
+): Promise<VideoSummaryData> {
+  if (!TWELVE_LABS_API_KEY) {
+    throw new Error("Twelve Labs API key is not configured.");
+  }
+
+  if (!videoId) {
+    throw new Error("Video ID is required to generate a summary.");
+  }
+
+  const requestBody: any = {
+    video_id: videoId,
+    type: "summary",
+  };
+
+  if (prompt) {
+    requestBody.prompt = prompt;
+  }
+  if (temperature !== undefined) {
+    requestBody.temperature = temperature;
+  }
+
+  try {
+    console.log(
+      `Requesting video summary from Twelve Labs: ${TWELVE_LABS_BASE_URL}/summarize`,
+      requestBody
+    );
+
+    const response = await axios.post(
+      `${TWELVE_LABS_BASE_URL}/summarize`,
+      requestBody,
+      {
+        headers: {
+          "x-api-key": TWELVE_LABS_API_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    // As per docs, response is { id: string, summary: string, usage: {...} }
+    if (
+      response.data &&
+      typeof response.data.summary === "string" &&
+      typeof response.data.id === "string"
+    ) {
+      return {
+        id: response.data.id,
+        summary: response.data.summary,
+        // usage: response.data.usage // if you want to return usage
+      };
+    } else {
+      console.error(
+        "Unexpected response structure from /summarize:",
+        response.data
+      );
+      throw new Error(
+        "Unexpected response structure from Twelve Labs summarize API."
+      );
+    }
+  } catch (error) {
+    console.error("Error calling Twelve Labs /summarize API:", error);
+    if (axios.isAxiosError(error) && error.response) {
+      const errorData = error.response.data as TwelveLabsErrorData;
+      const errorMessage =
+        errorData?.message ||
+        (typeof errorData?.detail === "string"
+          ? errorData.detail
+          : JSON.stringify(errorData?.detail));
+      console.error("Twelve Labs API Error Details (Summarize):", errorData);
+      throw new Error(
+        `Twelve Labs API error (${
+          error.response.status
+        }) during summarization: ${errorMessage || "Unknown error"}`
+      );
+    }
+    if (error instanceof Error) {
+      throw new Error(`Failed to generate video summary: ${error.message}`);
+    }
+    throw new Error(
+      "Failed to generate video summary due to an unknown error."
+    );
   }
 }
