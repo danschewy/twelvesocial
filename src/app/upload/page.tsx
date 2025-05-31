@@ -513,7 +513,7 @@ export default function UploadPage() {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-purple-500/5 to-blue-500/5 rounded-full blur-3xl animate-spin-slow"></div>
       </div>
 
-      <div className="relative z-10 container mx-auto px-6 py-8 max-w-7xl">
+      <div className="relative z-10 container mx-auto px-6 py-8 max-w-4xl">
         {/* Enhanced Header */}
         <div className="mb-12">
           <div className="text-center space-y-4">
@@ -534,332 +534,326 @@ export default function UploadPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
-          {/* Left Column - Upload Only */}
-          <div className="xl:col-span-2 space-y-8">
-            {/* Upload Section */}
-            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-purple-500/30 transition-all duration-500">
+        <div className="space-y-8">
+          {/* Upload Section */}
+          <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-purple-500/30 transition-all duration-500">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center">
+                <span className="text-2xl">📁</span>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white">Select or Upload Video</h2>
+                <p className="text-purple-200">Choose from existing videos or upload a new one</p>
+              </div>
+            </div>
+            
+            <VideoUploader
+              onVideoUploaded={handleVideoUploaded}
+              videoPresent={!!(uploadedVideoFile || selectedExistingVideo)}
+            />
+
+            {isLoadingVideos && (
+              <div className="mt-6 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-2"></div>
+                <p className="text-sm text-gray-300">Loading your indexed videos...</p>
+              </div>
+            )}
+            
+            {errorLoadingVideos && (
+              <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+                <p className="text-red-300">Error loading videos: {errorLoadingVideos}</p>
+              </div>
+            )}
+
+            {indexedVideos && indexedVideos.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-xl font-semibold mb-4 text-white">Or choose an existing video:</h3>
+                <div className="max-h-60 overflow-y-auto space-y-3 pr-2">
+                  {indexedVideos
+                    .filter((v) => v.status === "ready" && v.video_id)
+                    .map((videoTask) => (
+                      <button
+                        key={videoTask._id}
+                        onClick={() => handleExistingVideoSelected(videoTask)}
+                        className={`w-full text-left p-4 rounded-2xl transition-all duration-300 flex items-center gap-4 ${
+                          selectedExistingVideo?.video_id === videoTask.video_id
+                            ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30"
+                            : "bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20"
+                        }`}
+                      >
+                        {videoTask.hls?.thumbnail_urls?.[0] && (
+                          <Image
+                            src={videoTask.hls.thumbnail_urls[0]}
+                            alt="Thumbnail"
+                            width={64}
+                            height={40}
+                            className="object-cover rounded-xl flex-shrink-0"
+                            unoptimized={true}
+                          />
+                        )}
+                        <div className="flex-grow overflow-hidden">
+                          <p
+                            className="font-medium truncate text-white"
+                            title={
+                              videoTask.system_metadata?.filename ||
+                              videoTask.video_id
+                            }
+                          >
+                            {videoTask.system_metadata?.filename ||
+                              videoTask.video_id}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Uploaded: {new Date(videoTask.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+            
+            {indexedVideos && indexedVideos.length === 0 && !isLoadingVideos && (
+              <div className="mt-6 text-center py-8 text-gray-400">
+                <div className="text-4xl mb-4 opacity-50">📹</div>
+                <p>No ready videos found in your index. Upload one to get started!</p>
+              </div>
+            )}
+          </div>
+
+          {/* Video Preview Section */}
+          <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-orange-500/30 transition-all duration-500">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center">
+                <span className="text-2xl">📺</span>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white">Preview & Chat</h2>
+                <p className="text-orange-200">Watch your video and chat with AI</p>
+              </div>
+            </div>
+
+            {/* Video Player */}
+            <div className="mb-6 bg-black rounded-2xl aspect-video overflow-hidden flex items-center justify-center border border-white/10">
+              {isFetchingVideoDetails ? (
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-2"></div>
+                  <p className="text-gray-400">Fetching video stream...</p>
+                </div>
+              ) : videoPreviewSrc || selectedVideoHlsUrl ? (
+                <video
+                  ref={videoRef}
+                  controls
+                  className="w-full h-full object-contain"
+                  onError={(e) => console.error("Video player error:", e)}
+                  onLoadedMetadata={() => console.log("Video metadata loaded")}
+                  onCanPlay={() => console.log("Video can play")}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-6xl mb-4 opacity-50">📹</div>
+                    <p className="text-gray-400">Video preview will appear here.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {selectedVideoHlsUrl && (
+              <p className="text-xs text-gray-400 mb-4 text-center bg-white/5 p-3 rounded-xl">
+                Note: HLS video streaming might require specific browser support (e.g., Safari) or a dedicated HLS player for other browsers.
+              </p>
+            )}
+
+            {/* Chat Interface */}
+            {sessionId ? (
+              <ChatInterface
+                videoId={videoId}
+                sessionId={sessionId}
+                videoAnalysis={videoAnalysis}
+                onSearchPromptGenerated={handleSearchPromptGenerated}
+              />
+            ) : (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-2"></div>
+                <p className="text-gray-300">Loading chat...</p>
+              </div>
+            )}
+          </div>
+
+          {/* Search & Clips Section */}
+          {videoId && (
+            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-green-500/30 transition-all duration-500">
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center">
-                  <span className="text-2xl">📁</span>
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-2xl flex items-center justify-center">
+                  <span className="text-2xl">🔍</span>
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-white">Select or Upload Video</h2>
-                  <p className="text-purple-200">Choose from existing videos or upload a new one</p>
+                  <h2 className="text-2xl font-bold text-white">Refine & Search Clips</h2>
+                  <p className="text-green-200">Define what you&apos;re looking for in your video</p>
                 </div>
               </div>
               
-              <VideoUploader
-                onVideoUploaded={handleVideoUploaded}
-                videoPresent={!!(uploadedVideoFile || selectedExistingVideo)}
-              />
+              {aiSearchPrompts && aiSearchPrompts.searchQueries && aiSearchPrompts.searchQueries.length > 0 ? (
+                <div className="space-y-6">
+                  {aiSearchPrompts.notesForUser && (
+                    <div className="p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-2xl">
+                      <p className="text-blue-200">
+                        <span className="font-semibold">AI Assistant:</span> {aiSearchPrompts.notesForUser}
+                      </p>
+                    </div>
+                  )}
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="searchQueryText" className="block text-sm font-medium text-gray-300 mb-2">
+                        Edit Search Query (for{" "}
+                        <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded">
+                          {aiSearchPrompts.searchQueries[0].searchOptions.join(", ")}
+                        </span>
+                        ):
+                      </label>
+                      <textarea
+                        id="searchQueryText"
+                        rows={3}
+                        value={editableQueryText}
+                        onChange={(e) => setEditableQueryText(e.target.value)}
+                        className="w-full p-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent backdrop-blur-xl transition-all duration-300"
+                        placeholder="Enter your search query for Twelve Labs"
+                      />
+                    </div>
+                    <button
+                      onClick={handleSearchClips}
+                      disabled={!editableQueryText.trim() || isSearching}
+                      className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-bold rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 shadow-lg hover:shadow-green-500/25"
+                    >
+                      {isSearching ? (
+                        <div className="flex items-center justify-center gap-3">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          <span>Searching...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-3">
+                          <span className="text-xl">🔍</span>
+                          <span>Search Clips</span>
+                        </div>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 text-center border border-dashed border-white/20 rounded-2xl">
+                  <div className="text-6xl mb-4 opacity-50">💬</div>
+                  <p className="text-gray-300 text-lg mb-2">
+                    Chat with the AI to define what you&apos;re looking for in
+                    &quot;{currentVideoName || "your video"}&quot;.
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    Suggested search queries will appear here once generated.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
-              {isLoadingVideos && (
-                <div className="mt-6 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-2"></div>
-                  <p className="text-sm text-gray-300">Loading your indexed videos...</p>
+          {/* Search Results Section */}
+          {(isSearching || searchError || searchResults) && videoId && (
+            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-blue-500/30 transition-all duration-500">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center">
+                  <span className="text-2xl">🎬</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Found Clips</h2>
+                  <p className="text-blue-200">Select clips to generate</p>
+                </div>
+              </div>
+              
+              {isSearching && (
+                <div className="text-center py-16">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                  <p className="text-gray-300 text-lg">Loading clips...</p>
                 </div>
               )}
               
-              {errorLoadingVideos && (
-                <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-                  <p className="text-red-300">Error loading videos: {errorLoadingVideos}</p>
+              {searchError && (
+                <div className="text-center py-16">
+                  <div className="text-6xl mb-4 opacity-50">⚠️</div>
+                  <p className="text-red-300 text-lg">Error finding clips: {searchError}</p>
                 </div>
               )}
-
-              {indexedVideos && indexedVideos.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="text-xl font-semibold mb-4 text-white">Or choose an existing video:</h3>
-                  <div className="max-h-60 overflow-y-auto space-y-3 pr-2">
-                    {indexedVideos
-                      .filter((v) => v.status === "ready" && v.video_id)
-                      .map((videoTask) => (
-                        <button
-                          key={videoTask._id}
-                          onClick={() => handleExistingVideoSelected(videoTask)}
-                          className={`w-full text-left p-4 rounded-2xl transition-all duration-300 flex items-center gap-4 ${
-                            selectedExistingVideo?.video_id === videoTask.video_id
-                              ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30"
-                              : "bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20"
-                          }`}
+              
+              {searchResults && !isSearching && (
+                <>
+                  {searchResults.length === 0 && (
+                    <div className="text-center py-16 text-gray-400">
+                      <div className="text-6xl mb-4 opacity-50">🔍</div>
+                      <p className="text-lg">No clips found matching your query.</p>
+                    </div>
+                  )}
+                  {searchResults.length > 0 && (
+                    <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                      {searchResults.map((clip, index) => (
+                        <div
+                          key={index}
+                          className="bg-white/5 border border-white/10 p-4 rounded-2xl flex gap-4 items-start hover:bg-white/10 hover:border-white/20 transition-all duration-300"
                         >
-                          {videoTask.hls?.thumbnail_urls?.[0] && (
+                          {clip.thumbnail_url && (
                             <Image
-                              src={videoTask.hls.thumbnail_urls[0]}
-                              alt="Thumbnail"
-                              width={64}
-                              height={40}
+                              src={clip.thumbnail_url}
+                              alt={`Clip thumbnail ${index + 1}`}
+                              width={96}
+                              height={56}
                               className="object-cover rounded-xl flex-shrink-0"
                               unoptimized={true}
                             />
                           )}
-                          <div className="flex-grow overflow-hidden">
-                            <p
-                              className="font-medium truncate text-white"
-                              title={
-                                videoTask.system_metadata?.filename ||
-                                videoTask.video_id
-                              }
-                            >
-                              {videoTask.system_metadata?.filename ||
-                                videoTask.video_id}
+                          <div className="flex-grow">
+                            <p className="text-sm font-semibold text-white mb-1">
+                              Clip {index + 1}: {clip.start.toFixed(2)}s - {clip.end.toFixed(2)}s
                             </p>
-                            <p className="text-xs text-gray-400">
-                              Uploaded: {new Date(videoTask.created_at).toLocaleDateString()}
+                            <p className="text-xs text-gray-300">
+                              Score: {clip.score.toFixed(2)} | Confidence: {clip.confidence}
                             </p>
                           </div>
-                        </button>
-                      ))}
-                  </div>
-                </div>
-              )}
-              
-              {indexedVideos && indexedVideos.length === 0 && !isLoadingVideos && (
-                <div className="mt-6 text-center py-8 text-gray-400">
-                  <div className="text-4xl mb-4 opacity-50">📹</div>
-                  <p>No ready videos found in your index. Upload one to get started!</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column - Video Preview, Chat, Search & Clips */}
-          <div className="space-y-8">
-            {/* Video Preview Section */}
-            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-orange-500/30 transition-all duration-500">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center">
-                  <span className="text-2xl">📺</span>
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">Preview & Chat</h2>
-                  <p className="text-orange-200">Watch your video and chat with AI</p>
-                </div>
-              </div>
-
-              {/* Video Player */}
-              <div className="mb-6 bg-black rounded-2xl aspect-video overflow-hidden flex items-center justify-center border border-white/10">
-                {isFetchingVideoDetails ? (
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-2"></div>
-                    <p className="text-gray-400">Fetching video stream...</p>
-                  </div>
-                ) : videoPreviewSrc || selectedVideoHlsUrl ? (
-                  <video
-                    ref={videoRef}
-                    controls
-                    className="w-full h-full object-contain"
-                    onError={(e) => console.error("Video player error:", e)}
-                    onLoadedMetadata={() => console.log("Video metadata loaded")}
-                    onCanPlay={() => console.log("Video can play")}
-                  >
-                    Your browser does not support the video tag.
-                  </video>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="text-6xl mb-4 opacity-50">📹</div>
-                      <p className="text-gray-400">Video preview will appear here.</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {selectedVideoHlsUrl && (
-                <p className="text-xs text-gray-400 mb-4 text-center bg-white/5 p-3 rounded-xl">
-                  Note: HLS video streaming might require specific browser support (e.g., Safari) or a dedicated HLS player for other browsers.
-                </p>
-              )}
-
-              {/* Chat Interface */}
-              {sessionId ? (
-                <ChatInterface
-                  videoId={videoId}
-                  sessionId={sessionId}
-                  videoAnalysis={videoAnalysis}
-                  onSearchPromptGenerated={handleSearchPromptGenerated}
-                />
-              ) : (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-2"></div>
-                  <p className="text-gray-300">Loading chat...</p>
-                </div>
-              )}
-            </div>
-
-            {/* Search & Clips Section - Moved here */}
-            {videoId && (
-              <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-green-500/30 transition-all duration-500">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-2xl flex items-center justify-center">
-                    <span className="text-2xl">🔍</span>
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">Refine & Search Clips</h2>
-                    <p className="text-green-200">Define what you&apos;re looking for in your video</p>
-                  </div>
-                </div>
-                
-                {aiSearchPrompts && aiSearchPrompts.searchQueries && aiSearchPrompts.searchQueries.length > 0 ? (
-                  <div className="space-y-6">
-                    {aiSearchPrompts.notesForUser && (
-                      <div className="p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-2xl">
-                        <p className="text-blue-200">
-                          <span className="font-semibold">AI Assistant:</span> {aiSearchPrompts.notesForUser}
-                        </p>
-                      </div>
-                    )}
-                    <div className="space-y-4">
-                      <div>
-                        <label htmlFor="searchQueryText" className="block text-sm font-medium text-gray-300 mb-2">
-                          Edit Search Query (for{" "}
-                          <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded">
-                            {aiSearchPrompts.searchQueries[0].searchOptions.join(", ")}
-                          </span>
-                          ):
-                        </label>
-                        <textarea
-                          id="searchQueryText"
-                          rows={3}
-                          value={editableQueryText}
-                          onChange={(e) => setEditableQueryText(e.target.value)}
-                          className="w-full p-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent backdrop-blur-xl transition-all duration-300"
-                          placeholder="Enter your search query for Twelve Labs"
-                        />
-                      </div>
-                      <button
-                        onClick={handleSearchClips}
-                        disabled={!editableQueryText.trim() || isSearching}
-                        className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-bold rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 shadow-lg hover:shadow-green-500/25"
-                      >
-                        {isSearching ? (
-                          <div className="flex items-center justify-center gap-3">
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                            <span>Searching...</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center gap-3">
-                            <span className="text-xl">🔍</span>
-                            <span>Search Clips</span>
-                          </div>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-8 text-center border border-dashed border-white/20 rounded-2xl">
-                    <div className="text-6xl mb-4 opacity-50">💬</div>
-                    <p className="text-gray-300 text-lg mb-2">
-                      Chat with the AI to define what you&apos;re looking for in
-                      &quot;{currentVideoName || "your video"}&quot;.
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      Suggested search queries will appear here once generated.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Search Results Section - Moved here */}
-            {(isSearching || searchError || searchResults) && videoId && (
-              <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-blue-500/30 transition-all duration-500">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center">
-                    <span className="text-2xl">🎬</span>
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">Found Clips</h2>
-                    <p className="text-blue-200">Select clips to generate</p>
-                  </div>
-                </div>
-                
-                {isSearching && (
-                  <div className="text-center py-16">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                    <p className="text-gray-300 text-lg">Loading clips...</p>
-                  </div>
-                )}
-                
-                {searchError && (
-                  <div className="text-center py-16">
-                    <div className="text-6xl mb-4 opacity-50">⚠️</div>
-                    <p className="text-red-300 text-lg">Error finding clips: {searchError}</p>
-                  </div>
-                )}
-                
-                {searchResults && !isSearching && (
-                  <>
-                    {searchResults.length === 0 && (
-                      <div className="text-center py-16 text-gray-400">
-                        <div className="text-6xl mb-4 opacity-50">🔍</div>
-                        <p className="text-lg">No clips found matching your query.</p>
-                      </div>
-                    )}
-                    {searchResults.length > 0 && (
-                      <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                        {searchResults.map((clip, index) => (
-                          <div
-                            key={index}
-                            className="bg-white/5 border border-white/10 p-4 rounded-2xl flex gap-4 items-start hover:bg-white/10 hover:border-white/20 transition-all duration-300"
-                          >
-                            {clip.thumbnail_url && (
-                              <Image
-                                src={clip.thumbnail_url}
-                                alt={`Clip thumbnail ${index + 1}`}
-                                width={96}
-                                height={56}
-                                className="object-cover rounded-xl flex-shrink-0"
-                                unoptimized={true}
-                              />
+                          <input
+                            type="checkbox"
+                            className="ml-auto h-5 w-5 text-blue-500 bg-white/10 border-white/20 rounded focus:ring-blue-400 focus:ring-offset-gray-800"
+                            checked={selectedClips.some(
+                              (sc) =>
+                                sc.start === clip.start &&
+                                sc.end === clip.end &&
+                                sc.video_id === clip.video_id
                             )}
-                            <div className="flex-grow">
-                              <p className="text-sm font-semibold text-white mb-1">
-                                Clip {index + 1}: {clip.start.toFixed(2)}s - {clip.end.toFixed(2)}s
-                              </p>
-                              <p className="text-xs text-gray-300">
-                                Score: {clip.score.toFixed(2)} | Confidence: {clip.confidence}
-                              </p>
-                            </div>
-                            <input
-                              type="checkbox"
-                              className="ml-auto h-5 w-5 text-blue-500 bg-white/10 border-white/20 rounded focus:ring-blue-400 focus:ring-offset-gray-800"
-                              checked={selectedClips.some(
-                                (sc) =>
-                                  sc.start === clip.start &&
-                                  sc.end === clip.end &&
-                                  sc.video_id === clip.video_id
-                              )}
-                              onChange={() => handleToggleClipSelection(clip)}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {searchResults && searchResults.length > 0 && (
-                      <button
-                        onClick={handleGenerateClips}
-                        disabled={isGeneratingClips || selectedClips.length === 0}
-                        className="mt-6 w-full px-6 py-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-bold rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 shadow-lg hover:shadow-purple-500/25"
-                      >
-                        {isGeneratingClips ? (
-                          <div className="flex items-center justify-center gap-3">
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                            <span>Generating Clips...</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center gap-3">
-                            <span className="text-xl">✨</span>
-                            <span>Generate {selectedClips.length} Selected Clip(s)</span>
-                          </div>
-                        )}
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+                            onChange={() => handleToggleClipSelection(clip)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {searchResults && searchResults.length > 0 && (
+                    <button
+                      onClick={handleGenerateClips}
+                      disabled={isGeneratingClips || selectedClips.length === 0}
+                      className="mt-6 w-full px-6 py-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-bold rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 shadow-lg hover:shadow-purple-500/25"
+                    >
+                      {isGeneratingClips ? (
+                        <div className="flex items-center justify-center gap-3">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          <span>Generating Clips...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-3">
+                          <span className="text-xl">✨</span>
+                          <span>Generate {selectedClips.length} Selected Clip(s)</span>
+                        </div>
+                      )}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Generated Clips Results Section */}
