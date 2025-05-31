@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  chain,
-  HumanMessage,
-  AIMessage,
-  ChatMessageHistory,
-} from "@/lib/langchain";
+import { chain, ChatMessageHistory } from "@/lib/langchain";
 import { RunnableWithMessageHistory } from "@langchain/core/runnables";
 
 // A simple in-memory store for chat histories.
@@ -17,7 +12,7 @@ export async function POST(req: NextRequest) {
     const { message, sessionId, videoId } = body;
 
     // Enhanced validation
-    if (!message || typeof message !== 'string' || !message.trim()) {
+    if (!message || typeof message !== "string" || !message.trim()) {
       return NextResponse.json(
         { error: "Message is required and must be a non-empty string." },
         { status: 400 }
@@ -43,7 +38,7 @@ export async function POST(req: NextRequest) {
     // Only add the new user message to history (don't clear and reconstruct)
     // The history should persist across requests
     const userInput = message.trim();
-    
+
     // Check for empty input after trimming
     if (!userInput) {
       return NextResponse.json({
@@ -68,8 +63,12 @@ export async function POST(req: NextRequest) {
     });
 
     // Prepare the input with video context
-    const chainInput: any = {
+    const chainInput: {
+      input: string;
+      video_id_for_context: string;
+    } = {
       input: userInput,
+      video_id_for_context: "",
     };
 
     // Add video context if videoId is provided
@@ -79,10 +78,9 @@ export async function POST(req: NextRequest) {
       chainInput.video_id_for_context = "No video uploaded yet";
     }
 
-    const result = await chainWithHistory.invoke(
-      chainInput,
-      { configurable: { sessionId: currentSessionKey } }
-    );
+    const result = await chainWithHistory.invoke(chainInput, {
+      configurable: { sessionId: currentSessionKey },
+    });
 
     // The result from LangChain is an AIMessage content
     const botResponseText = result.content as string;
@@ -99,30 +97,38 @@ export async function POST(req: NextRequest) {
       try {
         const jsonString = jsonMatch[1].trim();
         searchPromptData = JSON.parse(jsonString);
-        
+
         // Validate the JSON structure
-        if (searchPromptData && 
-            searchPromptData.searchQueries && 
-            Array.isArray(searchPromptData.searchQueries) &&
-            searchPromptData.searchQueries.length > 0) {
-          
+        if (
+          searchPromptData &&
+          searchPromptData.searchQueries &&
+          Array.isArray(searchPromptData.searchQueries) &&
+          searchPromptData.searchQueries.length > 0
+        ) {
           // Use notesForUser as the plain text reply if available
           if (searchPromptData.notesForUser) {
             plainTextReply = searchPromptData.notesForUser;
           } else {
-            plainTextReply = "I've prepared some search queries for you. Let me know if you'd like to adjust them!";
+            plainTextReply =
+              "I've prepared some search queries for you. Let me know if you'd like to adjust them!";
           }
-          
+
           // Remove the JSON block from the original response if it exists
-          plainTextReply = botResponseText.replace(jsonRegex, '').trim() || plainTextReply;
-          
+          plainTextReply =
+            botResponseText.replace(jsonRegex, "").trim() || plainTextReply;
         } else {
           // Invalid JSON structure, treat as regular response
-          console.warn("AI returned JSON with invalid structure:", searchPromptData);
+          console.warn(
+            "AI returned JSON with invalid structure:",
+            searchPromptData
+          );
           searchPromptData = null;
         }
       } catch (e) {
-        console.warn("AI returned a JSON-like block, but it failed to parse:", e);
+        console.warn(
+          "AI returned a JSON-like block, but it failed to parse:",
+          e
+        );
         searchPromptData = null;
         // Keep the original response including the malformed JSON
       }
@@ -140,35 +146,39 @@ export async function POST(req: NextRequest) {
       },
       searchPromptData: searchPromptData,
     });
-
   } catch (error) {
     console.error("Error in /api/chat:", error);
-    
-    let errorMessage = "I'm experiencing some technical difficulties. Please try again in a moment.";
+
+    let errorMessage =
+      "I'm experiencing some technical difficulties. Please try again in a moment.";
     let statusCode = 500;
-    
+
     if (error instanceof Error) {
       // Handle specific error types
       if (error.message.includes("API key")) {
-        errorMessage = "There's an issue with the AI service configuration. Please contact support.";
+        errorMessage =
+          "There's an issue with the AI service configuration. Please contact support.";
         statusCode = 503;
       } else if (error.message.includes("rate limit")) {
-        errorMessage = "I'm receiving too many requests right now. Please wait a moment and try again.";
+        errorMessage =
+          "I'm receiving too many requests right now. Please wait a moment and try again.";
         statusCode = 429;
       } else if (error.message.includes("timeout")) {
-        errorMessage = "The request took too long to process. Please try again.";
+        errorMessage =
+          "The request took too long to process. Please try again.";
         statusCode = 408;
       } else if (error.message.includes("network")) {
-        errorMessage = "I'm having trouble connecting to the AI service. Please check your connection and try again.";
+        errorMessage =
+          "I'm having trouble connecting to the AI service. Please check your connection and try again.";
         statusCode = 503;
       }
     }
-    
+
     return NextResponse.json(
-      { 
-        error: "Chat service temporarily unavailable", 
+      {
+        error: "Chat service temporarily unavailable",
         details: errorMessage,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       },
       { status: statusCode }
     );

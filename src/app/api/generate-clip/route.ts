@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getManualIndexId,
-  getVideoDetails,
-} from "@/lib/twelvelabs.server";
+import { getManualIndexId, getVideoDetails } from "@/lib/twelvelabs.server";
 import { extractClip } from "@/lib/ffmpeg";
-import path from "path";
 import { v4 as uuidv4 } from "uuid";
 
 interface ClipSegment {
@@ -88,9 +84,9 @@ export async function POST(req: NextRequest) {
     const hlsUrl = videoDetails.hls?.video_url;
     if (!hlsUrl) {
       return NextResponse.json(
-        { 
+        {
           error: "Video HLS stream not available for clip generation.",
-          details: "The video must have an HLS stream URL to generate clips."
+          details: "The video must have an HLS stream URL to generate clips.",
         },
         { status: 400 }
       );
@@ -100,15 +96,21 @@ export async function POST(req: NextRequest) {
 
     // 4. Generate clips using FFmpeg
     const clipResults: GeneratedClipInfo[] = [];
-    
+
     for (let i = 0; i < segments.length; i++) {
       const segment = segments[i];
       const duration = segment.end - segment.start;
-      const fileName = `clip_${i + 1}_${segment.start.toFixed(1)}s-${segment.end.toFixed(1)}s_${uuidv4().slice(0, 8)}.mp4`;
-      
+      const fileName = `clip_${i + 1}_${segment.start.toFixed(
+        1
+      )}s-${segment.end.toFixed(1)}s_${uuidv4().slice(0, 8)}.mp4`;
+
       try {
-        console.log(`Generating clip ${i + 1}/${segments.length}: ${segment.start}s - ${segment.end}s`);
-        
+        console.log(
+          `Generating clip ${i + 1}/${segments.length}: ${segment.start}s - ${
+            segment.end
+          }s`
+        );
+
         // Use FFmpeg to extract the clip
         const clipData = await extractClip(
           hlsUrl,
@@ -116,20 +118,26 @@ export async function POST(req: NextRequest) {
           segment.end,
           fileName
         );
-        
+
         clipResults.push({
           id: segment.id,
           fileName: clipData.fileName,
-          downloadUrl: `/api/download-clip?file=${encodeURIComponent(clipData.fileName)}`,
-          message: `Clip generated successfully (${duration.toFixed(1)}s duration)`,
+          downloadUrl: `/api/download-clip?file=${encodeURIComponent(
+            clipData.fileName
+          )}`,
+          message: `Clip generated successfully (${duration.toFixed(
+            1
+          )}s duration)`,
         });
-        
+
         console.log(`Successfully generated clip: ${clipData.fileName}`);
-        
       } catch (clipError) {
         console.error(`Failed to generate clip ${i + 1}:`, clipError);
-        const errorMessage = clipError instanceof Error ? clipError.message : "Unknown FFmpeg error";
-        
+        const errorMessage =
+          clipError instanceof Error
+            ? clipError.message
+            : "Unknown FFmpeg error";
+
         clipResults.push({
           id: segment.id,
           fileName: fileName,
@@ -140,10 +148,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const successfulClips = clipResults.filter(clip => !clip.error).length;
+    const successfulClips = clipResults.filter((clip) => !clip.error).length;
     const failedClips = clipResults.length - successfulClips;
-    
-    console.log(`Clip generation complete: ${successfulClips} successful, ${failedClips} failed`);
+
+    console.log(
+      `Clip generation complete: ${successfulClips} successful, ${failedClips} failed`
+    );
 
     return NextResponse.json({
       message: `Clip generation complete. ${successfulClips} successful, ${failedClips} failed.`,
