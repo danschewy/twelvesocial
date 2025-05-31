@@ -4,3 +4,7 @@ libpulse-dev
 pulseaudio
 libx264-dev
 libx265-dev
+libpulse0
+libavcodec-extra
+libavformat-dev
+libavutil-dev
