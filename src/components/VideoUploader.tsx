@@ -184,7 +184,7 @@ export default function VideoUploader({
     try {
       // Use XMLHttpRequest for upload progress tracking
       const xhr = new XMLHttpRequest();
-      let startTime = Date.now();
+      const startTime = Date.now();
       let lastLoaded = 0;
       let lastTime = startTime;
 

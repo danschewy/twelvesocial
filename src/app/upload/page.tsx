@@ -750,8 +750,8 @@ export default function UploadPage() {
                   <div className="p-8 text-center border border-dashed border-white/20 rounded-2xl">
                     <div className="text-6xl mb-4 opacity-50">💬</div>
                     <p className="text-gray-300 text-lg mb-2">
-                      Chat with the AI to define what you're looking for in
-                      "{currentVideoName || "your video"}".
+                      Chat with the AI to define what you&apos;re looking for in
+                      &quot;{currentVideoName || "your video"}&quot;.
                     </p>
                     <p className="text-sm text-gray-400">
                       Suggested search queries will appear here once generated.
