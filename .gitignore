@@ -64,3 +64,4 @@ scripts/example_prd.txt
 scripts/*report*.json
 .taskmasterconfig
 *.mdc 
+/tmp
