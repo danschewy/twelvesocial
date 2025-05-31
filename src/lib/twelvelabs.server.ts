@@ -251,10 +251,22 @@ export async function searchVideo(
   if (!videoId) throw new Error("Video ID is required to scope the search.");
   if (!query) throw new Error("Search query is required.");
 
+  // Filter and validate search options - only 'visual' and 'audio' are supported
+  const validOptions = ["visual", "audio"];
+  const filteredOptions = searchOptions.filter(option => validOptions.includes(option));
+  
+  // If no valid options, default to both
+  const finalOptions = filteredOptions.length > 0 ? filteredOptions : ["visual", "audio"];
+  
+  console.log(`Search options: ${finalOptions.join(', ')}`);
+
   const formData = new FormData();
   formData.append("index_id", indexId);
   formData.append("query_text", query);
-  searchOptions.forEach((option) => formData.append("search_options", option));
+  
+  // Append each valid search option
+  finalOptions.forEach((option) => formData.append("search_options", option));
+  
   formData.append("filter", JSON.stringify({ id: [videoId] }));
   formData.append("page_limit", pageLimit.toString());
 

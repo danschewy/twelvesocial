@@ -107,3 +107,20 @@ export interface VideoSummaryData {
   summary: string; // The generated summary text
   // usage?: { output_tokens: number }; // Optional: if you want to include usage stats
 }
+
+// Video Analysis Types for pre-analysis functionality
+export interface VideoAnalysisInsights {
+  contentType: "tutorial" | "interview" | "presentation" | "general";
+  keyTopics: string[];
+  suggestedClips: string[];
+  hasQuotes: boolean;
+  hasVisualElements: boolean;
+  estimatedClipCount: number;
+}
+
+export interface VideoAnalysis {
+  summary: string;
+  videoId: string;
+  analyzedAt: string;
+  insights: VideoAnalysisInsights;
+}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chain, ChatMessageHistory } from "@/lib/langchain";
 import { RunnableWithMessageHistory } from "@langchain/core/runnables";
+import { getManualIndexId, getVideoDetails } from "@/lib/twelvelabs.server";
 
 // A simple in-memory store for chat histories.
 // In a production app, you'd replace this with a persistent store (e.g., Redis, a database).
@@ -9,7 +10,7 @@ const messageHistories: Record<string, ChatMessageHistory> = {};
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { message, sessionId, videoId } = body;
+    const { message, sessionId, videoId, videoAnalysis } = body;
 
     // Enhanced validation
     if (!message || typeof message !== "string" || !message.trim()) {
@@ -62,20 +63,77 @@ export async function POST(req: NextRequest) {
       historyMessagesKey: "history",
     });
 
-    // Prepare the input with video context
+    // Prepare the input with comprehensive video context
     const chainInput: {
       input: string;
-      video_id_for_context: string;
+      video_context: string;
     } = {
       input: userInput,
-      video_id_for_context: "",
+      video_context: "",
     };
 
-    // Add video context if videoId is provided
+    // Add comprehensive video context if videoId is provided
     if (videoId) {
-      chainInput.video_id_for_context = `Video ID: ${videoId} (This video has been uploaded and is ready for analysis)`;
+      try {
+        console.log(`Fetching comprehensive video context for: ${videoId}`);
+        const indexId = await getManualIndexId();
+        const videoDetails = await getVideoDetails(indexId, videoId);
+        
+        // Create rich video context with analysis data
+        const videoContext = {
+          video_id: videoId,
+          filename: videoDetails.system_metadata?.filename || "Unknown",
+          duration: videoDetails.system_metadata?.duration || 0,
+          width: videoDetails.system_metadata?.width || 0,
+          height: videoDetails.system_metadata?.height || 0,
+          status: videoDetails.status,
+          created_at: videoDetails.created_at,
+          indexed_at: videoDetails.indexed_at,
+        };
+
+        let contextString = `VIDEO CONTEXT:
+- Video ID: ${videoContext.video_id}
+- Filename: ${videoContext.filename}
+- Duration: ${Math.round(videoContext.duration)} seconds (${Math.floor(videoContext.duration / 60)}:${String(Math.round(videoContext.duration % 60)).padStart(2, '0')})
+- Resolution: ${videoContext.width}x${videoContext.height}
+- Status: ${videoContext.status}
+- Uploaded: ${new Date(videoContext.created_at).toLocaleDateString()}
+- Indexed: ${videoContext.indexed_at ? new Date(videoContext.indexed_at).toLocaleDateString() : 'Processing'}
+
+This video has been successfully uploaded and indexed by Twelve Labs and is ready for analysis and clip generation.`;
+
+        // Add video analysis context if available
+        if (videoAnalysis) {
+          contextString += `
+
+VIDEO ANALYSIS:
+- Content Type: ${videoAnalysis.insights.contentType}
+- Key Topics: ${videoAnalysis.insights.keyTopics.join(', ') || 'None identified'}
+- Has Quotes: ${videoAnalysis.insights.hasQuotes ? 'Yes' : 'No'}
+- Has Visual Elements: ${videoAnalysis.insights.hasVisualElements ? 'Yes' : 'No'}
+- Estimated Clip Count: ${videoAnalysis.insights.estimatedClipCount}
+
+SUGGESTED CLIP TYPES:
+${videoAnalysis.insights.suggestedClips.map((clip: string, index: number) => `${index + 1}. ${clip}`).join('\n')}
+
+VIDEO SUMMARY:
+${videoAnalysis.summary}
+
+IMPORTANT: Use this analysis to immediately generate search queries for common requests like "highlight reel", "best moments", "key quotes", etc. Don't ask clarifying questions unless the request is truly ambiguous.`;
+        }
+
+        chainInput.video_context = contextString;
+        console.log("Comprehensive video context prepared with analysis data");
+      } catch (error) {
+        console.warn("Failed to fetch video details for context:", error);
+        // Fallback to basic context
+        chainInput.video_context = `VIDEO CONTEXT:
+- Video ID: ${videoId}
+- Status: Ready for analysis
+- This video has been uploaded and is ready for clip generation.`;
+      }
     } else {
-      chainInput.video_id_for_context = "No video uploaded yet";
+      chainInput.video_context = "No video uploaded yet. User needs to upload a video first before we can generate clips.";
     }
 
     const result = await chainWithHistory.invoke(chainInput, {

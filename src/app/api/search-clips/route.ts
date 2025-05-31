@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`Searching video ${videoId} for: "${query}"`);
+    console.log(`Received search options:`, searchOptions);
 
     // 1. Get the manually configured Index ID
     let indexId: string;
@@ -51,6 +52,8 @@ export async function POST(req: NextRequest) {
       const options = Array.isArray(searchOptions) 
         ? searchOptions 
         : ["visual", "audio"]; // Default search options - only visual and audio are supported by Twelve Labs
+      
+      console.log(`Final search options being sent to Twelve Labs:`, options);
       
       searchResults = await searchVideo(
         indexId,

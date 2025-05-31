@@ -12,6 +12,7 @@ import {
 import Image from "next/image"; // Import Next.js Image component
 import Hls from "hls.js"; // Import Hls.js
 import Link from "next/link"; // Import Link component
+import type { VideoAnalysis } from "@/lib/twelvelabs";
 
 // Define types for the search prompt data from the AI
 interface SearchQueryItem {
@@ -78,6 +79,10 @@ export default function UploadPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isFetchingVideoDetails, setIsFetchingVideoDetails] =
     useState<boolean>(false);
+
+  const [videoAnalysis, setVideoAnalysis] = useState<VideoAnalysis | null>(null);
+  const [isAnalyzingVideo, setIsAnalyzingVideo] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
     // Generate a session ID when the component mounts
@@ -249,128 +254,82 @@ export default function UploadPage() {
     setClipGenerationError(null);
   };
 
-  const handleVideoUploaded = async (file: File, twelveLabsVideoId: string) => {
-    setVideoId(twelveLabsVideoId);
-    setSelectedExistingVideo(null);
-    resetAllClipStates();
-    console.log(
-      "Newly uploaded video processed by Twelve Labs. Video ID:",
-      twelveLabsVideoId
-    );
-    console.log("Attempting to fetch HLS stream for preview...");
-    setIsFetchingVideoDetails(true);
+  const analyzeVideo = async (videoId: string) => {
+    if (!videoId) return;
+    
+    setIsAnalyzingVideo(true);
+    setAnalysisError(null);
+    
     try {
-      const response = await fetch(`/api/video-details/${twelveLabsVideoId}`);
-      if (!response.ok) {
-        let errorMsg = "Failed to fetch video details from API.";
-        try {
-          const errorData = await response.json();
-          errorMsg = errorData.details || errorData.message || errorMsg;
-        } catch (e) {
-          // If parsing errorData fails, use the original errorMsg or response statusText
-          errorMsg = response.statusText || errorMsg || (e as string);
-        }
-        throw new Error(errorMsg);
-      }
-      const details: VideoDetailsType = await response.json();
+      console.log(`Starting video analysis for: ${videoId}`);
+      const response = await fetch("/api/analyze-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoId }),
+      });
 
-      if (details.hls?.video_url) {
-        setSelectedVideoHlsUrl(details.hls.video_url);
-        setUploadedVideoFile(null);
-        console.log(
-          "HLS stream URL fetched and set for preview:",
-          details.hls.video_url
-        );
-      } else {
-        console.warn(
-          "Video processed, but HLS stream URL not found in details. Will rely on local preview if available, or list selection."
-        );
-        setUploadedVideoFile(file);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || "Failed to analyze video");
       }
+
+      const result = await response.json();
+      console.log("Video analysis completed:", result.analysis);
+      setVideoAnalysis(result.analysis);
     } catch (error) {
-      console.error("Error fetching video details for HLS stream:", error);
-      setUploadedVideoFile(file);
-      setErrorLoadingVideos(
-        "Could not load HLS stream for preview. Using local file if possible."
-      );
+      console.error("Failed to analyze video:", error);
+      if (error instanceof Error) {
+        setAnalysisError(error.message);
+      } else {
+        setAnalysisError("An unknown error occurred during video analysis.");
+      }
     } finally {
-      setIsFetchingVideoDetails(false);
+      setIsAnalyzingVideo(false);
     }
   };
 
+  const handleVideoUploaded = async (file: File, twelveLabsVideoId: string) => {
+    console.log("Video uploaded:", { file: file.name, videoId: twelveLabsVideoId });
+    setUploadedVideoFile(file);
+    setVideoId(twelveLabsVideoId);
+    setSelectedExistingVideo(null);
+    setLocalPreviewUrl(URL.createObjectURL(file));
+    resetAllClipStates();
+
+    // Trigger video analysis
+    await analyzeVideo(twelveLabsVideoId);
+  };
+
   const handleExistingVideoSelected = async (videoTask: VideoTask) => {
-    if (videoTask.video_id && videoTask.status === "ready") {
-      setVideoId(videoTask.video_id);
-      setSelectedExistingVideo(videoTask);
-      setUploadedVideoFile(null);
-      setSelectedVideoHlsUrl(null); // Clear any previous HLS URL immediately
-      resetAllClipStates();
-      console.log(
-        "Existing video selected, Twelve Labs Video ID:",
-        videoTask.video_id
-      );
-      console.log(
-        "Attempting to fetch HLS stream for selected existing video..."
-      );
-      setIsFetchingVideoDetails(true); // Reuse existing loading state
-      try {
-        const response = await fetch(
-          `/api/video-details/${videoTask.video_id}`
-        );
-        if (!response.ok) {
-          let errorMsg = "Failed to fetch video details for selected video.";
-          try {
-            const errorData = await response.json();
-            errorMsg = errorData.details || errorData.message || errorMsg;
-          } catch (e) {
-            errorMsg = response.statusText || errorMsg || (e as string);
-          }
-          throw new Error(errorMsg);
+    console.log("Existing video selected:", videoTask);
+    setSelectedExistingVideo(videoTask);
+    setVideoId(videoTask.video_id);
+    setUploadedVideoFile(null);
+    setLocalPreviewUrl(null);
+    resetAllClipStates();
+
+    // Fetch video details for HLS URL
+    setIsFetchingVideoDetails(true);
+    try {
+      const response = await fetch(`/api/video-details/${videoTask.video_id}`);
+      if (response.ok) {
+        const videoDetails = await response.json();
+        console.log("Video details fetched:", videoDetails);
+        if (videoDetails.hls?.video_url) {
+          setSelectedVideoHlsUrl(videoDetails.hls.video_url);
+          console.log("HLS URL set:", videoDetails.hls.video_url);
         }
-        const details: VideoDetailsType = await response.json();
-        if (details.hls?.video_url) {
-          setSelectedVideoHlsUrl(details.hls.video_url);
-          console.log(
-            "HLS stream URL fetched and set for selected existing video:",
-            details.hls.video_url
-          );
-        } else {
-          console.warn(
-            "HLS stream URL not found in details for selected existing video."
-          );
-          // Potentially set an error or notification for the user here if preview is expected
-          setErrorLoadingVideos(
-            `Video selected, but no HLS stream is available for preview (${
-              videoTask.system_metadata?.filename || videoTask.video_id
-            }).`
-          );
-        }
-      } catch (error) {
-        console.error(
-          "Error fetching video details for selected existing video:",
-          error
-        );
-        if (error instanceof Error) {
-          setErrorLoadingVideos(
-            `Could not load HLS stream for preview: ${error.message}`
-          );
-        } else {
-          setErrorLoadingVideos(
-            "An unknown error occurred while fetching HLS stream for selected video."
-          );
-        }
-      } finally {
-        setIsFetchingVideoDetails(false);
+      } else {
+        console.error("Failed to fetch video details");
       }
-    } else {
-      console.warn(
-        "Selected video task is not ready or has no video_id:",
-        videoTask
-      );
-      alert(
-        "This video is not yet ready or is invalid. Please select another."
-      );
+    } catch (error) {
+      console.error("Error fetching video details:", error);
+    } finally {
+      setIsFetchingVideoDetails(false);
     }
+
+    // Trigger video analysis
+    await analyzeVideo(videoTask.video_id);
   };
 
   const handleSearchPromptGenerated = (data: SearchPromptData) => {
@@ -409,7 +368,7 @@ export default function UploadPage() {
     // or default to general search options. This needs refinement for multiple queries.
     const searchOptions = aiSearchPrompts?.searchQueries[0]?.searchOptions || [
       "visual",
-      "conversation",
+      "audio",
     ];
 
     console.log("Searching clips with:", {
@@ -797,8 +756,8 @@ export default function UploadPage() {
               <ChatInterface
                 videoId={videoId}
                 sessionId={sessionId}
+                videoAnalysis={videoAnalysis}
                 onSearchPromptGenerated={handleSearchPromptGenerated}
-                key={videoId || "no-video"}
               />
             ) : (
               <p className="text-center text-gray-300">Loading chat...</p>
