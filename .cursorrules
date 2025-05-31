@@ -251,120 +251,136 @@ Please tell me which option best fits your goal, or describe it in your own word
 
 This comprehensive outline should give you a solid foundation for building your Next.js video clip generation tool!
 
+# Instructions
+
+During your interaction with the user, if you find anything reusable in this project (e.g. version of a library, model name), especially about a fix to a mistake you made or a correction you received, you should take note in the `Lessons` section in the `.cursorrules` file so you will not make the same mistake again. 
+
+You should also use the `.cursorrules` file as a Scratchpad to organize your thoughts. Especially when you receive a new task, you should first review the content of the Scratchpad, clear old different task if necessary, first explain the task, and plan the steps you need to take to complete the task. You can use todo markers to indicate the progress, e.g.
+[X] Task 1
+[ ] Task 2
+
+Also update the progress of the task in the Scratchpad when you finish a subtask.
+Especially when you finished a milestone, it will help to improve your depth of task accomplishment to use the Scratchpad to reflect and plan.
+The goal is to help you maintain a big picture as well as the progress of the task. Always refer to the Scratchpad when you plan the next step.
+
+Write tests first, then the code, then run the tests and update the code until tests pass.
+
+# Tools
+
+Note all the tools are in python. So in the case you need to do batch processing, you can always consult the python files and write your own script.
+
+## Screenshot Verification
+
+The screenshot verification workflow allows you to capture screenshots of web pages and verify their appearance using LLMs. The following tools are available:
+```bash
+venv/bin/python tools/screenshot_utils.py URL [--output OUTPUT] [--width WIDTH] [--height HEIGHT]
+```
+
+2. LLM Verification with Images:
+```bash
+venv/bin/python tools/llm_api.py --prompt "Your verification question" --provider {openai|anthropic} --image path/to/screenshot.png
+```
+
+Example workflow:
+```python
+from screenshot_utils import take_screenshot_sync
+from llm_api import query_llm
+
+# Take a screenshot
+
+screenshot_path = take_screenshot_sync('https://example.com', 'screenshot.png')
+
+# Verify with LLM
+
+response = query_llm(
+    "What is the background color and title of this webpage?",
+    provider="openai",  # or "anthropic"
+    image_path=screenshot_path
+)
+print(response)
+```
+
+## LLM
+
+You always have an LLM at your side to help you with the task. For simple tasks, you could invoke the LLM by running the following command:
+```
+venv/bin/python ./tools/llm_api.py --prompt "What is the capital of France?" --provider "anthropic"
+```
+
+The LLM API supports multiple providers:
+- OpenAI (default, model: gpt-4o)
+- Azure OpenAI (model: configured via AZURE_OPENAI_MODEL_DEPLOYMENT in .env file, defaults to gpt-4o-ms)
+- DeepSeek (model: deepseek-chat)
+- Anthropic (model: claude-3-sonnet-20240229)
+- Gemini (model: gemini-pro)
+- Local LLM (model: Qwen/Qwen2.5-32B-Instruct-AWQ)
+
+But usually it's a better idea to check the content of the file and use the APIs in the `tools/llm_api.py` file to invoke the LLM if needed.
+
+## Web browser
+
+You could use the `tools/web_scraper.py` file to scrape the web.
+```
+venv/bin/python ./tools/web_scraper.py --max-concurrent 3 URL1 URL2 URL3
+```
+This will output the content of the web pages.
+
+## Search engine
+
+You could use the `tools/search_engine.py` file to search the web.
+```
+venv/bin/python ./tools/search_engine.py "your search keywords"
+```
+This will output the search results in the following format:
+```
+URL: https://example.com
+Title: This is the title of the search result
+Snippet: This is a snippet of the search result
+```
+If needed, you can further use the `web_scraper.py` file to scrape the web page content.
+
+# Lessons
+
+## User Specified Lessons
+
+- You have a python venv in ./venv. Use it.
+- Include info useful for debugging in the program output.
+- Read the file before you try to edit it.
+- Due to Cursor's limit, when you use `git` and `gh` and need to submit a multiline commit message, first write the message in a file, and then use `git commit -F <filename>` or similar command to commit. And then remove the file. Include "[Cursor] " in the commit message and PR title.
+
+## Cursor learned
+
+- For search results, ensure proper handling of different character encodings (UTF-8) for international queries
+- Add debug information to stderr while keeping the main output clean in stdout for better pipeline integration
+- When using seaborn styles in matplotlib, use 'seaborn-v0_8' instead of 'seaborn' as the style name due to recent seaborn version changes
+- Use 'gpt-4o' as the model name for OpenAI's GPT-4 with vision capabilities
+- When enhancing AI chat context, fetch rich video details (filename, duration, resolution) to provide better context for more efficient clip generation
+- Use GPT-4o model for better video understanding and context awareness in chat systems
+
 # Scratchpad
 
-## Current Task: Fixing Clip Download Issue
-[X] Analyze current chat implementation
-[X] Identify specific issues with AI responses
-[X] Upgrade to better AI model (GPT-4o)
-[X] Improve system prompt for better responses
-[X] Add better error handling and user feedback
-[X] Implement typing indicators and better UX
-[X] Add conversation memory and context
-[X] Fix search options issue (conversation/ocr → visual/audio)
-[X] Fix chat memory issue (persistent server-side history)
-[X] Fix video context awareness issue (AI didn't know video was uploaded)
-[X] Test improved chat functionality
-[X] Fix HLS.js console error (circular reference in error logging)
-[X] Create environment file for partner
-[X] Fix clip download issue (mock data vs actual file generation)
+## 🚨 CURRENT TASK: Fix DigitalOcean Deployment Build Errors
 
-## Latest Issue: Clip Download Error (FIXED!)
-**Problem**: Users get "File wasn't available on site" error when trying to download clips because:
-- ✅ The `generate-clip` API returns mock URLs without actually generating files
-- ✅ The download URLs don't match the expected format for the download API  
-- ✅ FFmpeg implementation exists but isn't being used
+**Task Understanding**: The dev branch deployment to DigitalOcean App Platform is failing due to ESLint errors treating unused variables as build-breaking errors.
 
-**Location**: `src/app/api/generate-clip/route.ts` and `src/app/api/download-clip/route.ts`
-**Error**: Mock URLs like `/api/download-clip/${segment.id}` but download API expects `?file=` parameter
+**🎯 BUILD ERRORS TO FIX**:
+1. ❌ Line 10:19 - 'VideoDetailsType' is defined but never used (though I can't find this in current code)
+2. ❌ Line 84:10 - 'isAnalyzingVideo' is assigned a value but never used  
+3. ❌ Line 85:10 - 'analysisError' is assigned a value but never used
 
-**Solution Applied**: 
-- ✅ Updated generate-clip API to actually use FFmpeg to create video files
-- ✅ Fixed URL format to match download API expectations (`?file=` parameter)
-- ✅ Added proper error handling for FFmpeg failures
-- ✅ Created proper file paths and cleanup
-- ✅ Verified FFmpeg 7.1.1 is installed and working
-- ✅ Created tmp/generated-clips directory for file storage
+**📋 IMPLEMENTATION PLAN**:
+[X] Remove or properly use the unused variables in upload/page.tsx
+[X] Check if VideoDetailsType import exists and remove if unused
+[X] Either use isAnalyzingVideo and analysisError in UI or remove them
+[X] Test build locally to ensure no more ESLint errors
+[ ] Commit and push fix to dev branch
 
-**Files Updated**:
-- ✅ `src/app/api/generate-clip/route.ts`: Implemented actual FFmpeg clip generation with HLS stream processing
+**🔍 ANALYSIS**:
+- The variables `isAnalyzingVideo` and `analysisError` are set in the `analyzeVideo` function but never displayed in the UI
+- They have eslint-disable comments but the build environment is still treating them as errors
+- Need to either remove them or actually use them in the component
 
-**Testing Notes**:
-- FFmpeg is installed and working (version 7.1.1)
-- Temporary directory created for clip storage
-- Download URLs now use proper format: `/api/download-clip?file=filename.mp4`
-- Error handling for both successful and failed clip generation
-- Sequential processing to avoid overwhelming the system
-
-## AI Chat Improvements Completed:
-1. **✅ Model Upgrade**: Switched from GPT-3.5-turbo to GPT-4o for much better reasoning
-2. **✅ Simplified System Prompt**: Made it conversational and less rigid, removed confusing JSON requirements
-3. **✅ Better UX**: Added typing indicators, loading spinners, auto-scroll, better visual design
-4. **✅ Enhanced Error Handling**: Specific error messages for API keys, rate limits, timeouts
-5. **✅ Improved Validation**: Better input validation and JSON parsing
-6. **✅ Conversational Flow**: More natural initial messages with emojis and friendly tone
-7. **✅ Fixed Search Options**: Updated from invalid "conversation"/"ocr" to valid "visual"/"audio"
-8. **✅ Fixed Chat Memory**: Implemented persistent server-side conversation history
-9. **✅ Fixed Video Context**: AI now knows when video is uploaded and ready for analysis
-
-## Technical Improvements Made:
-- ✅ **LangChain Config**: Upgraded model and simplified prompt in `src/lib/langchain.ts`
-- ✅ **Chat Interface**: Added typing indicators, better loading states in `src/components/ChatInterface.tsx`
-- ✅ **API Route**: Enhanced error handling and validation in `src/app/api/chat/route.ts`
-- ✅ **Environment Template**: Created `.env.example` for easy setup
-- ✅ **Search Options Fix**: Updated system prompt and API defaults to use correct Twelve Labs options
-- ✅ **Chat Memory Fix**: Fixed persistent conversation history in API route and ChatInterface
-- ✅ **Video Context Fix**: Updated system prompt and API route to properly handle video context
-
-## Key Changes:
-1. **Model**: `gpt-3.5-turbo` → `gpt-4o` (much smarter responses)
-2. **Prompt**: Removed complex JSON requirements, made conversational
-3. **UX**: Added bouncing dots typing indicator, loading spinner, auto-scroll
-4. **Errors**: Specific messages for different error types
-5. **Validation**: Better input checking and JSON structure validation
-6. **Search Options**: Fixed invalid "conversation"/"ocr" → valid "visual"/"audio"
-7. **Chat Memory**: Fixed persistent server-side history instead of clearing/reconstructing
-8. **Video Context**: AI now knows when video is uploaded and doesn't ask to upload again
-
-## Latest Fix: Video Context Awareness Issue
-**Problem**: The AI was asking users to upload videos even when they were already uploaded because:
-- The system prompt didn't mention video context awareness
-- The videoId was passed but not properly integrated into the prompt
-- The AI had no way to know a video was already processed and ready
-
-**Solution**: 
-- **System Prompt**: Added video context awareness section that explains when video is available
-- **API Route**: Properly substitute video context in the prompt with clear messaging
-- **Result**: AI now knows when video is uploaded and focuses on clip creation instead of asking for upload
-
-**Files Updated**:
-- `src/lib/langchain.ts`: Added video context awareness to system prompt
-- `src/app/api/chat/route.ts`: Properly substitute video context in chain input
-
-## Search Options Issue (Previously Fixed)
-**Problem**: Twelve Labs API was rejecting search requests because we were using invalid search options:
-- ❌ "conversation" and "ocr" (not supported)
-- ✅ "visual" and "audio" (correct options)
-
-**Files Updated**:
-- `src/lib/langchain.ts`: Updated system prompt to use correct search options
-- `src/app/api/search-clips/route.ts`: Fixed default search options
-- `src/lib/twelvelabs.server.ts`: Updated searchVideo function defaults
-
-## Next Steps:
-1. ✅ **Fix HLS Error**: Update error logging to avoid circular references
-2. ✅ **Test Upload Page**: Verify HLS video playback works without console errors
-3. ✅ **Environment Setup**: Help partner set up .env file with OpenAI API key
-4. ✅ **Fix Clip Downloads**: Implement actual FFmpeg clip generation instead of mock data
-
-## All Major Issues Resolved! 🎉
-
-The TwelveSocial application now has:
-- **Smart AI Chat**: GPT-4o powered conversations with memory and context
-- **Reliable Video Processing**: Fixed search options and HLS playback
-- **Better UX**: Typing indicators, loading states, error handling
-- **Clean Console**: No more circular reference errors
-- **Easy Setup**: Comprehensive environment configuration guide
-- **Working Clip Generation**: Real FFmpeg-powered video clip creation and downloads
-
-Your partner should now have a fully functional video clip generation app with working downloads!
+**⚡ SOLUTION APPROACH**:
+- Remove unused variables entirely since they're not being used in the UI
+- Clean up any unused imports
+- Ensure the build passes ESLint checks

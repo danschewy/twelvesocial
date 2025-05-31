@@ -1,0 +1,20 @@
+[Cursor] feat: Redesign social preview page with modern UI and update scratchpad
+
+- Applied app design system with dark gradient background and purple accents
+- Enhanced visual design with glass morphism cards and improved typography
+- Improved layout with responsive two-column grid and better readability
+- Added interactive features like enhanced copy feedback and social media tips
+- Updated scratchpad to reflect completed social preview page redesign task
+- Enhanced mobile responsiveness and touch-friendly interface
+- Added proper loading states, error handling, and user feedback
+
+The social preview page now matches the app's aesthetic and provides significantly improved readability and user experience.
+
+[Cursor] Fix DigitalOcean deployment build errors
+
+Remove unused variables causing ESLint build failures:
+- Remove isAnalyzingVideo and analysisError state variables
+- Clean up analyzeVideo function to not use removed variables
+- Redirect error handling to existing clipGenerationError state
+
+Build now passes ESLint checks for deployment. 

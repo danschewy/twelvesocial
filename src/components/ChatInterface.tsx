@@ -23,212 +23,373 @@ interface SearchPromptData {
   notesForUser: string;
 }
 
+interface VideoAnalysis {
+  insights: {
+    contentType: string;
+    estimatedClipCount: number;
+  };
+}
+
 interface ChatInterfaceProps {
   videoId: string | null; // videoId can be null initially
   sessionId: string; // Added sessionId prop
-  onSearchPromptGenerated: (data: SearchPromptData) => void; // Added prop
+  videoAnalysis?: VideoAnalysis | null; // Add video analysis prop
+  onSearchPromptGenerated: (data: SearchPromptData) => void;
 }
 
 export default function ChatInterface({
   videoId,
   sessionId,
+  videoAnalysis,
   onSearchPromptGenerated,
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
+  const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
+  const [hasVideoContextBeenAdded, setHasVideoContextBeenAdded] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
+  // Suggested prompts for quick actions
+  const suggestedPrompts = [
+    "Create highlight reel",
+    "Find key quotes", 
+    "Break into clips",
+    "Most engaging parts"
+  ];
+
+  // Auto-scroll to bottom when new messages are added
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  }, [messages]);
 
+  // Add initial context message when video becomes available - FASTER LOADING
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isTyping]);
+    console.log('ChatInterface: useEffect triggered with:', { 
+      videoId, 
+      hasVideoContextBeenAdded, 
+      messagesLength: messages.length 
+    });
+    
+    if (videoId && !hasVideoContextBeenAdded) {
+      console.log('ChatInterface: Adding immediate message for videoId:', videoId);
+      
+      // Send immediate message when video is uploaded
+      const immediateMessage: Message = {
+        id: `immediate-${Date.now()}`,
+        text: `🎥 **Video Uploaded Successfully!** 
 
-  useEffect(() => {
-    // Initial bot message with guiding questions - more conversational
-    setMessages([
-      {
-        id: "init-1",
-        text: "Hi! I'm here to help you create amazing social media clips from your video. 🎬",
+I'm analyzing your video now to understand its content and find the best moments for clips. This will just take a moment...
+
+While I work on that, you can tell me what type of clips you'd like to create:
+
+**Popular Options:**
+• "Create highlight reel" - Best moments
+• "Find key quotes" - Important statements  
+• "Break into clips" - Topic-based segments
+• "Most engaging parts" - High-energy moments
+
+What would you like to do with your video?`,
         sender: "bot",
         timestamp: new Date(),
-      },
-      {
-        id: "init-2",
-        text: "What kind of clips are you looking to create? For example:\n• Highlight reel of the best moments\n• Clips focused on specific topics\n• Breaking down a tutorial into steps\n• Showcasing different segments",
+      };
+      
+      console.log('ChatInterface: Setting messages to:', [immediateMessage]);
+      setMessages([immediateMessage]);
+      setHasVideoContextBeenAdded(true);
+      setShowSuggestions(true); // Show suggestions immediately
+      console.log('ChatInterface: Immediate message added, hasVideoContextBeenAdded set to true');
+    }
+  }, [videoId, hasVideoContextBeenAdded, messages.length]);
+
+  // Update message when video analysis is complete
+  useEffect(() => {
+    if (videoId && hasVideoContextBeenAdded && videoAnalysis && videoAnalysis.insights) {
+      console.log('ChatInterface: Adding analysis complete message');
+      // Add analysis results message
+      const analysisMessage: Message = {
+        id: `analysis-${Date.now()}`,
+        text: `✅ **Analysis Complete!** I've analyzed your video and found it's a **${videoAnalysis.insights.contentType}** with ${videoAnalysis.insights.estimatedClipCount} potential clips.
+
+**Ready to create clips!** Just tell me what you&apos;re looking for and I&apos;ll generate the perfect search queries.`,
         sender: "bot",
         timestamp: new Date(),
-      },
-    ]);
-  }, []);
+      };
+      
+      setMessages(prev => [...prev, analysisMessage]);
+    }
+  }, [videoAnalysis, videoId, hasVideoContextBeenAdded]);
 
+  // Reset context flag when video changes - but preserve the immediate message logic
   useEffect(() => {
-    if (videoId) {
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        {
-          id: `system-videoid-${Date.now()}`,
-          text: `Perfect! Your video is ready for analysis. What would you like me to help you find? 🔍`,
-          sender: "bot",
-          timestamp: new Date(),
-        },
-      ]);
+    console.log('ChatInterface: Reset effect triggered for videoId:', videoId);
+    // Only reset if we're switching to a different video or clearing video
+    if (!videoId) {
+      console.log('ChatInterface: Clearing messages and resetting state');
+      setHasVideoContextBeenAdded(false);
+      setMessages([]); // Clear messages when video is cleared
+      setShowSuggestions(false);
     }
   }, [videoId]);
 
-  const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setInput(event.target.value);
-  };
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!input.trim() || isLoading) return;
-
+  // Handle suggestion click with auto-send
+  const handleSuggestionClick = async (suggestion: string) => {
+    setInputValue(suggestion);
+    setShowSuggestions(false); // Hide suggestions after clicking
+    
+    // Auto-send the suggestion
     const userMessage: Message = {
       id: `user-${Date.now()}`,
-      text: input,
+      text: suggestion,
       sender: "user",
       timestamp: new Date(),
     };
 
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
-    setInput("");
+    setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
-    setIsTyping(true);
 
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Send only the current message, sessionId, and videoId (if available)
-        body: JSON.stringify({ message: input.trim(), sessionId, videoId }),
+        body: JSON.stringify({
+          message: suggestion,
+          sessionId: sessionId,
+          videoId: videoId,
+          videoAnalysis: videoAnalysis,
+        }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.details || "Failed to fetch chat response");
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      const botResponseMessage: Message = data.reply;
 
-      setIsTyping(false);
-      setMessages((prevMessages) => [...prevMessages, botResponseMessage]);
+      if (data.error) {
+        throw new Error(data.details || data.error);
+      }
 
-      // If AI returned search prompt data, call the callback
+      // Add bot response to messages
+      const botMessage: Message = {
+        id: data.reply.id || `bot-${Date.now()}`,
+        text: data.reply.text,
+        sender: "bot",
+        timestamp: new Date(data.reply.timestamp),
+      };
+
+      setMessages((prev) => [...prev, botMessage]);
+
+      // If search prompt data is provided, trigger the callback
       if (data.searchPromptData) {
         onSearchPromptGenerated(data.searchPromptData);
       }
     } catch (error) {
-      console.error("Error fetching chat response:", error);
-      setIsTyping(false);
-      
-      let errorText = "I'm having trouble connecting right now. Please check your internet connection and try again.";
-      
-      if (error instanceof Error) {
-        if (error.message.includes("API key")) {
-          errorText = "It looks like there's an issue with the AI configuration. Please make sure your OpenAI API key is set up correctly.";
-        } else if (error.message.includes("rate limit")) {
-          errorText = "I'm getting too many requests right now. Please wait a moment and try again.";
-        } else {
-          errorText = `Sorry, I encountered an error: ${error.message}`;
-        }
-      }
-      
+      console.error("Error sending message:", error);
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
-        text: errorText,
+        text: `Sorry, I encountered an error: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }. Please try again.`,
         sender: "bot",
         timestamp: new Date(),
       };
-      setMessages((prevMessages) => [...prevMessages, errorMessage]);
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
-      setIsTyping(false);
+      setInputValue(""); // Clear input after auto-send
     }
   };
 
-  const TypingIndicator = () => (
-    <div className="flex justify-start">
-      <div className="max-w-xs lg:max-w-md px-4 py-2 rounded-lg shadow bg-gray-700 text-gray-200">
-        <div className="flex items-center space-x-1">
-          <div className="flex space-x-1">
-            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-          </div>
-          <span className="text-xs text-gray-400 ml-2">AI is thinking...</span>
-        </div>
-      </div>
-    </div>
-  );
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!inputValue.trim() || isLoading) return;
+
+    setShowSuggestions(false); // Hide suggestions when user types
+
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      text: inputValue.trim(),
+      sender: "user",
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInputValue("");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: userMessage.text,
+          sessionId: sessionId,
+          videoId: videoId,
+          videoAnalysis: videoAnalysis, // Pass video analysis to API
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.details || data.error);
+      }
+
+      // Add bot response to messages
+      const botMessage: Message = {
+        id: data.reply.id || `bot-${Date.now()}`,
+        text: data.reply.text,
+        sender: "bot",
+        timestamp: new Date(data.reply.timestamp),
+      };
+
+      setMessages((prev) => [...prev, botMessage]);
+
+      // If search prompt data is provided, trigger the callback
+      if (data.searchPromptData) {
+        onSearchPromptGenerated(data.searchPromptData);
+      }
+    } catch (error) {
+      console.error("Error sending message:", error);
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        text: `Sorry, I encountered an error: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }. Please try again.`,
+        sender: "bot",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+    // Hide suggestions when user starts typing
+    if (e.target.value.length > 0) {
+      setShowSuggestions(false);
+    }
+  };
+
+  // Debug logging for render
+  console.log('ChatInterface: Rendering with state:', { 
+    messagesLength: messages.length, 
+    videoId, 
+    hasVideoContextBeenAdded,
+    showSuggestions 
+  });
 
   return (
-    <div className="flex flex-col h-[calc(100vh-12rem)] max-h-[700px] bg-gray-800/50 rounded-lg shadow-xl border border-gray-700">
-      <div className="flex-grow p-4 space-y-4 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-        {messages.map((msg) => (
+    <div className="flex flex-col h-full bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg shadow-sm">
+      {/* Chat Header */}
+      <div className="flex items-center justify-between p-4 border-b border-white/10 bg-white/5 rounded-t-lg">
+        <h3 className="text-lg font-semibold text-white">AI Assistant</h3>
+        {videoAnalysis && videoAnalysis.insights && (
+          <div className="text-sm text-gray-300">
+            📊 {videoAnalysis.insights.contentType} • {videoAnalysis.insights.estimatedClipCount} clips
+          </div>
+        )}
+      </div>
+
+      {/* Messages Container */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+        {messages.length === 0 && !videoId && (
+          <div className="text-center text-gray-400 py-8">
+            <p className="text-lg mb-2">👋 Welcome!</p>
+            <p>Upload a video to start creating social media clips with AI assistance.</p>
+          </div>
+        )}
+
+        {messages.length === 0 && videoId && (
+          <div className="text-center text-gray-400 py-8">
+            <p className="text-lg mb-2">🤔 No messages yet</p>
+            <p>Debug: videoId={videoId}, hasVideoContextBeenAdded={hasVideoContextBeenAdded}</p>
+          </div>
+        )}
+
+        {messages.map((message) => (
           <div
-            key={msg.id}
+            key={message.id}
             className={`flex ${
-              msg.sender === "user" ? "justify-end" : "justify-start"
+              message.sender === "user" ? "justify-end" : "justify-start"
             }`}
           >
             <div
-              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg shadow ${
-                msg.sender === "user"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-700 text-gray-200"
+              className={`max-w-[80%] p-3 rounded-lg ${
+                message.sender === "user"
+                  ? "bg-[hsl(280,100%,70%)] text-white"
+                  : "bg-white/10 text-white border border-white/20"
               }`}
             >
-              <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-              <p
+              <div className="whitespace-pre-wrap">{message.text}</div>
+              <div
                 className={`text-xs mt-1 ${
-                  msg.sender === "user" ? "text-blue-200" : "text-gray-400"
+                  message.sender === "user" ? "text-white/80" : "text-gray-400"
                 }`}
               >
-                {new Date(msg.timestamp).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
+                {message.timestamp.toLocaleTimeString()}
+              </div>
             </div>
           </div>
         ))}
-        {isTyping && <TypingIndicator />}
+
+        {/* Clickable Suggestion Buttons */}
+        {showSuggestions && videoId && !isLoading && (
+          <div className="flex flex-wrap gap-2 justify-center py-2">
+            {suggestedPrompts.map((prompt, index) => (
+              <button
+                key={index}
+                onClick={() => handleSuggestionClick(prompt)}
+                className="px-3 py-2 bg-[hsl(280,100%,70%)]/20 hover:bg-[hsl(280,100%,70%)]/30 border border-[hsl(280,100%,70%)]/40 text-white rounded-full text-sm transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[hsl(280,100%,70%)] focus:ring-offset-2 focus:ring-offset-transparent"
+              >
+                ✨ {prompt}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-white/10 text-white p-3 rounded-lg border border-white/20">
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[hsl(280,100%,70%)]"></div>
+                <span>AI is thinking...</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
-      <form onSubmit={handleSubmit} className="p-4 border-t border-gray-700">
-        <div className="flex items-center">
+
+      {/* Input Form */}
+      <form onSubmit={handleSubmit} className="p-4 border-t border-white/10">
+        <div className="flex space-x-2">
           <input
             type="text"
-            value={input}
+            value={inputValue}
             onChange={handleInputChange}
             placeholder={
-              videoId
-                ? "Ask about your video..."
-                : "Tell me about your video and what clips you want..."
+              videoId 
+                ? "Tell me what clips you want to create..." 
+                : "Upload a video first to start chatting..."
             }
-            disabled={isLoading}
-            className="flex-grow px-3 py-2 bg-gray-700 text-gray-200 border border-gray-600 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 placeholder-gray-400"
+            disabled={!videoId || isLoading}
+            className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[hsl(280,100%,70%)] focus:border-transparent disabled:bg-white/5 disabled:cursor-not-allowed"
           />
           <button
             type="submit"
-            disabled={isLoading || !input.trim()}
-            className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-r-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            disabled={!inputValue.trim() || !videoId || isLoading}
+            className="px-4 py-2 bg-[hsl(280,100%,70%)] text-white rounded-md hover:bg-[hsl(280,100%,65%)] focus:outline-none focus:ring-2 focus:ring-[hsl(280,100%,70%)] focus:ring-offset-2 focus:ring-offset-transparent disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
           >
-            {isLoading ? (
-              <div className="flex items-center">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                Sending...
-              </div>
-            ) : (
-              "Send"
-            )}
+            {isLoading ? "..." : "Send"}
           </button>
         </div>
       </form>

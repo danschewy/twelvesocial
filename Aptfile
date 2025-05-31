@@ -1,7 +1,11 @@
 ffmpeg
-libvpx7
-libpulse-dev
-pulseaudio
+libavcodec-extra
+libavformat-dev
+libavutil-dev
+libavdevice-dev
+libavfilter-dev
+libswscale-dev
+libswresample-dev
 libx264-dev
 libx265-dev
 libpulse0
