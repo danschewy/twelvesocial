@@ -359,147 +359,28 @@ If needed, you can further use the `web_scraper.py` file to scrape the web page 
 
 # Scratchpad
 
-## ✅ COMPLETED: Social Preview Page Redesign
+## 🚨 CURRENT TASK: Fix DigitalOcean Deployment Build Errors
 
-**Task Understanding**: Redesigned the social preview page to match the app's aesthetic and improve readability.
+**Task Understanding**: The dev branch deployment to DigitalOcean App Platform is failing due to ESLint errors treating unused variables as build-breaking errors.
 
-**🎯 IMPLEMENTATION COMPLETED**:
+**🎯 BUILD ERRORS TO FIX**:
+1. ❌ Line 10:19 - 'VideoDetailsType' is defined but never used (though I can't find this in current code)
+2. ❌ Line 84:10 - 'isAnalyzingVideo' is assigned a value but never used  
+3. ❌ Line 85:10 - 'analysisError' is assigned a value but never used
 
-### 1. ✅ Applied App Design System
-- **Dark Gradient Background**: Used `from-[#2e026d] to-[#15162c]` matching main app
-- **Purple Accent Color**: Applied `text-[hsl(280,100%,70%)]` for highlights
-- **Modern Typography**: Large, bold headings with proper hierarchy
-- **Consistent Spacing**: Proper padding, margins, and container sizing
+**📋 IMPLEMENTATION PLAN**:
+[X] Remove or properly use the unused variables in upload/page.tsx
+[X] Check if VideoDetailsType import exists and remove if unused
+[X] Either use isAnalyzingVideo and analysisError in UI or remove them
+[X] Test build locally to ensure no more ESLint errors
+[ ] Commit and push fix to dev branch
 
-### 2. ✅ Enhanced Visual Design
-- **Glass Morphism Cards**: `bg-white/5 backdrop-blur-sm border border-white/10`
-- **Improved Loading States**: Animated spinners with branded colors
-- **Better Error Handling**: Styled error cards with appropriate icons
-- **Enhanced Buttons**: Gradient backgrounds, hover effects, and icons
+**🔍 ANALYSIS**:
+- The variables `isAnalyzingVideo` and `analysisError` are set in the `analyzeVideo` function but never displayed in the UI
+- They have eslint-disable comments but the build environment is still treating them as errors
+- Need to either remove them or actually use them in the component
 
-### 3. ✅ Improved Layout & Readability
-- **Two-Column Grid**: Better organization on larger screens
-- **Card-Based Sections**: Clear separation of content areas
-- **Social Media Preview**: Styled like actual social media post
-- **Enhanced Typography**: Better contrast, spacing, and readability
-
-### 4. ✅ Added Interactive Features
-- **Better Copy Feedback**: Success state with visual confirmation
-- **Improved Navigation**: Styled back button with hover effects
-- **Social Media Tips**: Added helpful tips section
-- **Enhanced Video Player**: Better styling and error handling
-
-### 5. ✅ Mobile Responsiveness
-- **Responsive Grid**: `grid-cols-1 lg:grid-cols-2` for mobile-first design
-- **Proper Spacing**: Consistent padding and margins across devices
-- **Touch-Friendly**: Larger buttons and touch targets
-
-## 🚀 **VISUAL IMPROVEMENTS**:
-- **From**: Basic white background with minimal styling
-- **To**: Dark gradient with glass morphism cards and modern design
-- **Readability**: Improved contrast, typography, and content organization
-- **User Experience**: Better loading states, error handling, and feedback
-- **Brand Consistency**: Matches main app design with purple accents
-
-## 📱 **FEATURES ADDED**:
-- Social media post preview styled like real social platform
-- Tips section for social media best practices
-- Enhanced copy-to-clipboard with success feedback
-- Better video player styling and error handling
-- Improved loading and error states
-
-The social preview page now provides a beautiful, modern interface that matches the app's design system and significantly improves readability and user experience! 🎨✨
-
-## 🔧 PREVIOUS TASK: Fixing Search Options API Error
-
-**Issue**: Twelve Labs API rejecting search_options[1] parameter - only accepts "visual" and "audio"
-
-**🎯 FIXES APPLIED**:
-
-### 1. ✅ Updated System Prompt (langchain.ts)
-- Changed `"conversation"` → `"audio"` 
-- Removed `"ocr"` (not supported)
-- Updated all examples to use correct options
-
-### 2. ✅ Updated Default Options (upload page)
-- Changed default from `["visual", "conversation"]` → `["visual", "audio"]`
-
-### 3. ✅ Enhanced Server Validation (twelvelabs.server.ts)
-- Added search options filtering and validation
-- Only allows `["visual", "audio"]` to be sent to API
-- Defaults to both if invalid options provided
-- Added debug logging
-
-### 4. ✅ Enhanced API Debugging (search-clips route)
-- Added logging to see received vs sent search options
-- Better error tracking
-
-**🧪 TESTING NEEDED**:
-- Try "Create highlight reel" again
-- Check console logs for search options being sent
-- Verify no more "invalid search_options[1]" errors
-
-## ✅ COMPLETED: 1-Shot Video Clip Generation Implementation
-
-**Task Understanding**: Implemented comprehensive 1-shot video clip generation where users can request clips and get immediate search queries without clarifying questions.
-
-**🎯 IMPLEMENTATION COMPLETED**:
-
-### 1. ✅ Video Analysis API (`/api/analyze-video`)
-- Created comprehensive video analysis using Twelve Labs summarization
-- Extracts content type (tutorial, interview, presentation, general)
-- Identifies key topics, quotes, visual elements
-- Generates suggested clip types based on content
-- Provides structured insights for AI decision-making
-
-### 2. ✅ Enhanced Video Analysis Types
-- Added `VideoAnalysisInsights` and `VideoAnalysis` interfaces
-- Structured data for content type, topics, suggested clips
-- Supports intelligent clip recommendations
-
-### 3. ✅ Automatic Video Analysis Trigger
-- Updated upload flow to automatically analyze videos when selected/uploaded
-- Provides rich context immediately when video becomes available
-- Handles both new uploads and existing video selection
-
-### 4. ✅ Enhanced Chat API with Rich Context
-- Passes comprehensive video analysis to AI
-- Includes video metadata, content analysis, and suggested clips
-- Provides detailed context string for intelligent decision-making
-
-### 5. ✅ Action-Oriented System Prompt
-- **1-SHOT GENERATION RULES**: Immediate action for common requests
-- **Intelligent Query Generation**: Uses video analysis for smart queries
-- **Content Type Adaptation**: Different strategies for tutorials, interviews, presentations
-- **Multi-Query Strategy**: Generates 2-4 complementary queries
-- **Examples**: Clear patterns for "highlight reel", "best quotes", etc.
-- **FIXED**: Now uses correct search options ("visual", "audio")
-
-### 6. ✅ Updated ChatInterface
-- Passes video analysis data to chat API
-- Provides immediate context when video is ready
-- Shows content type and estimated clip count
-- Action-oriented messaging with quick examples
-
-## 🚀 **EXPECTED RESULTS**:
-- **True 1-Shot Generation**: "Create highlight reel" → Immediate search queries
-- **Smart Context Awareness**: AI knows video type, topics, duration
-- **Proactive Suggestions**: Based on content analysis
-- **Reduced Friction**: No more back-and-forth questioning
-- **Intelligent Defaults**: Content-type specific clip strategies
-- **API Compatibility**: Correct search options for Twelve Labs API
-
-## 🧪 **TESTING SCENARIOS**:
-1. Upload video → Auto-analysis → "Create highlight reel" → Immediate queries (NO API ERRORS)
-2. "Find best quotes" → Instant audio-based searches
-3. "Break into clips" → Content-type specific segmentation
-4. Different video types (tutorial, interview, presentation) → Adapted strategies
-
-## 📈 **PERFORMANCE IMPROVEMENTS**:
-- **From**: 3-5 exchanges to get clips
-- **To**: 1-2 exchanges maximum
-- **Context**: Rich video analysis provides immediate understanding
-- **Intelligence**: Content-aware query generation
-- **Reliability**: Proper API parameter validation
-
-The system now provides true 1-shot video clip generation with comprehensive video analysis, intelligent AI responses, and proper API compatibility! 🎬✨
+**⚡ SOLUTION APPROACH**:
+- Remove unused variables entirely since they're not being used in the UI
+- Clean up any unused imports
+- Ensure the build passes ESLint checks

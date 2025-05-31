@@ -80,10 +80,6 @@ export default function UploadPage() {
     useState<boolean>(false);
 
   const [videoAnalysis, setVideoAnalysis] = useState<VideoAnalysis | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [isAnalyzingVideo, setIsAnalyzingVideo] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
     // Generate a session ID when the component mounts
@@ -258,9 +254,6 @@ export default function UploadPage() {
   const analyzeVideo = async (videoId: string) => {
     if (!videoId) return;
     
-    setIsAnalyzingVideo(true);
-    setAnalysisError(null);
-    
     try {
       console.log(`Starting video analysis for: ${videoId}`);
       const response = await fetch("/api/analyze-video", {
@@ -280,12 +273,10 @@ export default function UploadPage() {
     } catch (error) {
       console.error("Failed to analyze video:", error);
       if (error instanceof Error) {
-        setAnalysisError(error.message);
+        setClipGenerationError(error.message);
       } else {
-        setAnalysisError("An unknown error occurred during video analysis.");
+        setClipGenerationError("An unknown error occurred during video analysis.");
       }
-    } finally {
-      setIsAnalyzingVideo(false);
     }
   };
 
