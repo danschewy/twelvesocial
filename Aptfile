@@ -2,3 +2,5 @@ ffmpeg
 libvpx7
 libpulse-dev
 pulseaudio
+libx264-dev
+libx265-dev
