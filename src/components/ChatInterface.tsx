@@ -47,19 +47,30 @@ export default function ChatInterface({
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [hasVideoContextBeenAdded, setHasVideoContextBeenAdded] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Suggested prompts for quick actions
+  const suggestedPrompts = [
+    "Create highlight reel",
+    "Find key quotes", 
+    "Break into clips",
+    "Most engaging parts"
+  ];
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Add initial context message when video becomes available
+  // Add initial context message when video becomes available - FASTER LOADING
   useEffect(() => {
-    if (videoId && !hasVideoContextBeenAdded && videoAnalysis) {
+    if (videoId && !hasVideoContextBeenAdded) {
+      // Immediate context message without waiting for analysis
       const contextMessage: Message = {
         id: `context-${Date.now()}`,
-        text: `🎥 **Video Ready!** I've analyzed your video and found it's a **${videoAnalysis.insights.contentType}** with ${videoAnalysis.insights.estimatedClipCount} potential clips.
+        text: videoAnalysis 
+          ? `🎥 **Video Ready!** I've analyzed your video and found it's a **${videoAnalysis.insights.contentType}** with ${videoAnalysis.insights.estimatedClipCount} potential clips.
 
 **Quick Actions:**
 • "Create highlight reel" - Best moments
@@ -67,17 +78,8 @@ export default function ChatInterface({
 • "Break into clips" - Topic-based segments
 • "Most engaging parts" - High-energy moments
 
-Just tell me what type of clips you want and I'll generate them immediately!`,
-        sender: "bot",
-        timestamp: new Date(),
-      };
-      setMessages([contextMessage]);
-      setHasVideoContextBeenAdded(true);
-    } else if (videoId && !hasVideoContextBeenAdded && !videoAnalysis) {
-      // Fallback message if analysis isn't available yet
-      const contextMessage: Message = {
-        id: `context-${Date.now()}`,
-        text: `🎥 **Video Uploaded!** Your video is ready for clip generation. Tell me what type of clips you'd like to create:
+Just tell me what type of clips you want and I'll generate them immediately!`
+          : `🎥 **Video Uploaded!** Your video is ready for clip generation. Tell me what type of clips you'd like to create:
 
 **Examples:**
 • "Create a highlight reel of the best moments"
@@ -91,6 +93,7 @@ What would you like to do with your video?`,
       };
       setMessages([contextMessage]);
       setHasVideoContextBeenAdded(true);
+      setShowSuggestions(true); // Show suggestions immediately
     }
   }, [videoId, hasVideoContextBeenAdded, videoAnalysis]);
 
@@ -98,11 +101,83 @@ What would you like to do with your video?`,
   useEffect(() => {
     setHasVideoContextBeenAdded(false);
     setMessages([]); // Clear messages when video changes
+    setShowSuggestions(false);
   }, [videoId]);
+
+  // Handle suggestion click with auto-send
+  const handleSuggestionClick = async (suggestion: string) => {
+    setInputValue(suggestion);
+    setShowSuggestions(false); // Hide suggestions after clicking
+    
+    // Auto-send the suggestion
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      text: suggestion,
+      sender: "user",
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: suggestion,
+          sessionId: sessionId,
+          videoId: videoId,
+          videoAnalysis: videoAnalysis,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.details || data.error);
+      }
+
+      // Add bot response to messages
+      const botMessage: Message = {
+        id: data.reply.id || `bot-${Date.now()}`,
+        text: data.reply.text,
+        sender: "bot",
+        timestamp: new Date(data.reply.timestamp),
+      };
+
+      setMessages((prev) => [...prev, botMessage]);
+
+      // If search prompt data is provided, trigger the callback
+      if (data.searchPromptData) {
+        onSearchPromptGenerated(data.searchPromptData);
+      }
+    } catch (error) {
+      console.error("Error sending message:", error);
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        text: `Sorry, I encountered an error: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }. Please try again.`,
+        sender: "bot",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+      setInputValue(""); // Clear input after auto-send
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
+
+    setShowSuggestions(false); // Hide suggestions when user types
 
     const userMessage: Message = {
       id: `user-${Date.now()}`,
@@ -169,15 +244,19 @@ What would you like to do with your video?`,
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
+    // Hide suggestions when user starts typing
+    if (e.target.value.length > 0) {
+      setShowSuggestions(false);
+    }
   };
 
   return (
-    <div className="flex flex-col h-full bg-white border border-gray-200 rounded-lg shadow-sm">
+    <div className="flex flex-col h-full bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg shadow-sm">
       {/* Chat Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-        <h3 className="text-lg font-semibold text-gray-800">AI Assistant</h3>
+      <div className="flex items-center justify-between p-4 border-b border-white/10 bg-white/5 rounded-t-lg">
+        <h3 className="text-lg font-semibold text-white">AI Assistant</h3>
         {videoAnalysis && (
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-gray-300">
             📊 {videoAnalysis.insights.contentType} • {videoAnalysis.insights.estimatedClipCount} clips
           </div>
         )}
@@ -186,7 +265,7 @@ What would you like to do with your video?`,
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {messages.length === 0 && !videoId && (
-          <div className="text-center text-gray-500 py-8">
+          <div className="text-center text-gray-400 py-8">
             <p className="text-lg mb-2">👋 Welcome!</p>
             <p>Upload a video to start creating social media clips with AI assistance.</p>
           </div>
@@ -202,14 +281,14 @@ What would you like to do with your video?`,
             <div
               className={`max-w-[80%] p-3 rounded-lg ${
                 message.sender === "user"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-100 text-gray-800"
+                  ? "bg-[hsl(280,100%,70%)] text-white"
+                  : "bg-white/10 text-white border border-white/20"
               }`}
             >
               <div className="whitespace-pre-wrap">{message.text}</div>
               <div
                 className={`text-xs mt-1 ${
-                  message.sender === "user" ? "text-blue-100" : "text-gray-500"
+                  message.sender === "user" ? "text-white/80" : "text-gray-400"
                 }`}
               >
                 {message.timestamp.toLocaleTimeString()}
@@ -218,11 +297,26 @@ What would you like to do with your video?`,
           </div>
         ))}
 
+        {/* Clickable Suggestion Buttons */}
+        {showSuggestions && videoId && !isLoading && (
+          <div className="flex flex-wrap gap-2 justify-center py-2">
+            {suggestedPrompts.map((prompt, index) => (
+              <button
+                key={index}
+                onClick={() => handleSuggestionClick(prompt)}
+                className="px-3 py-2 bg-[hsl(280,100%,70%)]/20 hover:bg-[hsl(280,100%,70%)]/30 border border-[hsl(280,100%,70%)]/40 text-white rounded-full text-sm transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[hsl(280,100%,70%)] focus:ring-offset-2 focus:ring-offset-transparent"
+              >
+                ✨ {prompt}
+              </button>
+            ))}
+          </div>
+        )}
+
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 text-gray-800 p-3 rounded-lg">
+            <div className="bg-white/10 text-white p-3 rounded-lg border border-white/20">
               <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[hsl(280,100%,70%)]"></div>
                 <span>AI is thinking...</span>
               </div>
             </div>
@@ -233,7 +327,7 @@ What would you like to do with your video?`,
       </div>
 
       {/* Input Form */}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200">
+      <form onSubmit={handleSubmit} className="p-4 border-t border-white/10">
         <div className="flex space-x-2">
           <input
             type="text"
@@ -245,12 +339,12 @@ What would you like to do with your video?`,
                 : "Upload a video first to start chatting..."
             }
             disabled={!videoId || isLoading}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[hsl(280,100%,70%)] focus:border-transparent disabled:bg-white/5 disabled:cursor-not-allowed"
           />
           <button
             type="submit"
             disabled={!inputValue.trim() || !videoId || isLoading}
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 bg-[hsl(280,100%,70%)] text-white rounded-md hover:bg-[hsl(280,100%,65%)] focus:outline-none focus:ring-2 focus:ring-[hsl(280,100%,70%)] focus:ring-offset-2 focus:ring-offset-transparent disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
           >
             {isLoading ? "..." : "Send"}
           </button>

@@ -7,7 +7,6 @@ import { v4 as uuidv4 } from "uuid";
 import {
   VideoTask,
   SearchClipData,
-  VideoDetails as VideoDetailsType,
 } from "@/lib/twelvelabs";
 import Image from "next/image"; // Import Next.js Image component
 import Hls from "hls.js"; // Import Hls.js
@@ -81,7 +80,9 @@ export default function UploadPage() {
     useState<boolean>(false);
 
   const [videoAnalysis, setVideoAnalysis] = useState<VideoAnalysis | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isAnalyzingVideo, setIsAnalyzingVideo] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -798,47 +799,40 @@ export default function UploadPage() {
                           gClip.error ? "border border-red-500" : ""
                         }`}
                       >
-                        <p
-                          className="text-sm font-semibold truncate"
-                          title={gClip.fileName}
-                        >
-                          {gClip.fileName}
-                        </p>
-                        {gClip.error ? (
-                          <p className="text-xs text-red-400">
-                            Error: {gClip.error}
-                          </p>
-                        ) : (
-                          <div className="mt-2 flex space-x-2">
-                            <a
-                              href={gClip.downloadUrl}
-                              download
-                              className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
-                            >
-                              Download Clip
-                            </a>
-                            {videoId && gClip.downloadUrl && (
+                        <div className="flex justify-between items-start">
+                          <div className="flex-grow">
+                            <p className="text-sm font-semibold text-white">
+                              {gClip.fileName}
+                            </p>
+                            <p className="text-xs text-gray-300">
+                              {gClip.message}
+                            </p>
+                            {gClip.error && (
+                              <p className="text-xs text-red-400 mt-1">
+                                Error: {gClip.error}
+                              </p>
+                            )}
+                          </div>
+                          {!gClip.error && (
+                            <div className="flex gap-2 ml-4">
+                              <a
+                                href={gClip.downloadUrl}
+                                download
+                                className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                              >
+                                Download
+                              </a>
                               <Link
                                 href={`/social-preview/${videoId}?clipUrl=${encodeURIComponent(
                                   gClip.downloadUrl
                                 )}`}
-                                passHref
-                                legacyBehavior
+                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
                               >
-                                <a
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                                >
-                                  Preview Social Post
-                                </a>
+                                Preview
                               </Link>
-                            )}
-                          </div>
-                        )}
-                        <p className="text-xs text-gray-400 mt-1">
-                          {gClip.message}
-                        </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
