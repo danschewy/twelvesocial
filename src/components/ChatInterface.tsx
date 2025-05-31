@@ -65,43 +65,71 @@ export default function ChatInterface({
 
   // Add initial context message when video becomes available - FASTER LOADING
   useEffect(() => {
+    console.log('ChatInterface: useEffect triggered with:', { 
+      videoId, 
+      hasVideoContextBeenAdded, 
+      messagesLength: messages.length 
+    });
+    
     if (videoId && !hasVideoContextBeenAdded) {
-      // Immediate context message without waiting for analysis
-      const contextMessage: Message = {
-        id: `context-${Date.now()}`,
-        text: videoAnalysis 
-          ? `🎥 **Video Ready!** I've analyzed your video and found it's a **${videoAnalysis.insights.contentType}** with ${videoAnalysis.insights.estimatedClipCount} potential clips.
+      console.log('ChatInterface: Adding immediate message for videoId:', videoId);
+      
+      // Send immediate message when video is uploaded
+      const immediateMessage: Message = {
+        id: `immediate-${Date.now()}`,
+        text: `🎥 **Video Uploaded Successfully!** 
 
-**Quick Actions:**
+I'm analyzing your video now to understand its content and find the best moments for clips. This will just take a moment...
+
+While I work on that, you can tell me what type of clips you'd like to create:
+
+**Popular Options:**
 • "Create highlight reel" - Best moments
 • "Find key quotes" - Important statements  
 • "Break into clips" - Topic-based segments
 • "Most engaging parts" - High-energy moments
 
-Just tell me what type of clips you want and I'll generate them immediately!`
-          : `🎥 **Video Uploaded!** Your video is ready for clip generation. Tell me what type of clips you'd like to create:
-
-**Examples:**
-• "Create a highlight reel of the best moments"
-• "Find all the key quotes and insights"  
-• "Break this into topic-based clips"
-• "Show me the most engaging parts"
-
 What would you like to do with your video?`,
         sender: "bot",
         timestamp: new Date(),
       };
-      setMessages([contextMessage]);
+      
+      console.log('ChatInterface: Setting messages to:', [immediateMessage]);
+      setMessages([immediateMessage]);
       setHasVideoContextBeenAdded(true);
       setShowSuggestions(true); // Show suggestions immediately
+      console.log('ChatInterface: Immediate message added, hasVideoContextBeenAdded set to true');
     }
-  }, [videoId, hasVideoContextBeenAdded, videoAnalysis]);
+  }, [videoId, hasVideoContextBeenAdded, messages.length]);
 
-  // Reset context flag when video changes
+  // Update message when video analysis is complete
   useEffect(() => {
-    setHasVideoContextBeenAdded(false);
-    setMessages([]); // Clear messages when video changes
-    setShowSuggestions(false);
+    if (videoId && hasVideoContextBeenAdded && videoAnalysis && videoAnalysis.insights) {
+      console.log('ChatInterface: Adding analysis complete message');
+      // Add analysis results message
+      const analysisMessage: Message = {
+        id: `analysis-${Date.now()}`,
+        text: `✅ **Analysis Complete!** I've analyzed your video and found it's a **${videoAnalysis.insights.contentType}** with ${videoAnalysis.insights.estimatedClipCount} potential clips.
+
+**Ready to create clips!** Just tell me what you're looking for and I'll generate the perfect search queries.`,
+        sender: "bot",
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, analysisMessage]);
+    }
+  }, [videoAnalysis, videoId, hasVideoContextBeenAdded]);
+
+  // Reset context flag when video changes - but preserve the immediate message logic
+  useEffect(() => {
+    console.log('ChatInterface: Reset effect triggered for videoId:', videoId);
+    // Only reset if we're switching to a different video or clearing video
+    if (!videoId) {
+      console.log('ChatInterface: Clearing messages and resetting state');
+      setHasVideoContextBeenAdded(false);
+      setMessages([]); // Clear messages when video is cleared
+      setShowSuggestions(false);
+    }
   }, [videoId]);
 
   // Handle suggestion click with auto-send
@@ -250,12 +278,20 @@ What would you like to do with your video?`,
     }
   };
 
+  // Debug logging for render
+  console.log('ChatInterface: Rendering with state:', { 
+    messagesLength: messages.length, 
+    videoId, 
+    hasVideoContextBeenAdded,
+    showSuggestions 
+  });
+
   return (
     <div className="flex flex-col h-full bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg shadow-sm">
       {/* Chat Header */}
       <div className="flex items-center justify-between p-4 border-b border-white/10 bg-white/5 rounded-t-lg">
         <h3 className="text-lg font-semibold text-white">AI Assistant</h3>
-        {videoAnalysis && (
+        {videoAnalysis && videoAnalysis.insights && (
           <div className="text-sm text-gray-300">
             📊 {videoAnalysis.insights.contentType} • {videoAnalysis.insights.estimatedClipCount} clips
           </div>
@@ -268,6 +304,13 @@ What would you like to do with your video?`,
           <div className="text-center text-gray-400 py-8">
             <p className="text-lg mb-2">👋 Welcome!</p>
             <p>Upload a video to start creating social media clips with AI assistance.</p>
+          </div>
+        )}
+
+        {messages.length === 0 && videoId && (
+          <div className="text-center text-gray-400 py-8">
+            <p className="text-lg mb-2">🤔 No messages yet</p>
+            <p>Debug: videoId={videoId}, hasVideoContextBeenAdded={hasVideoContextBeenAdded}</p>
           </div>
         )}
 
