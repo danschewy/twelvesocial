@@ -8,7 +8,3 @@ libx264-dev
 libx265-dev
 libvpx-dev
 libasound2-dev
-pulseaudio
-libpulse0
-libpulse-dev
-libpulsecommon-15.99
