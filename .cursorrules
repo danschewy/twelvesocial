@@ -1,0 +1,252 @@
+Next.js Video Clip Generator App Outline
+This outline details the structure and key components of your Next.js application, designed to help users transform long videos into social media-ready clips using AI.
+
+I. Project Structure
+/
+├── pages/
+│   ├── index.tsx             # Landing page / Get Started
+│   ├── upload.tsx            # Video upload interface
+│   ├── chat.tsx              # Main chatbot interaction and video preview
+│   └── results.tsx           # Display generated clips and social media posts
+├── components/
+│   ├── layout/               # General layout components (Header, Footer)
+│   │   └── Layout.tsx
+│   ├── ui/                   # Reusable UI components (buttons, inputs, modals)
+│   │   ├── Button.tsx
+│   │   ├── Input.tsx
+│   │   └── Modal.tsx
+│   ├── VideoUploader.tsx     # Handles video file input and upload
+│   ├── ChatInterface.tsx     # Displays chat messages and input field
+│   ├── VideoPlayer.tsx       # Embeds video player for preview
+│   ├── ClipPreviewCard.tsx   # Displays individual generated clips
+│   └── SocialPostPreview.tsx # Shows generated text post with options
+├── api/                      # Next.js API Routes (server-side logic)
+│   ├── upload-video.ts       # Handles video file upload to cloud storage / Twelve Labs
+│   ├── process-video.ts      # Triggers Twelve Labs video indexing
+│   ├── chat.ts               # Proxies requests to LangChain/OpenAI chatbot
+│   ├── search-clips.ts       # Queries Twelve Labs for relevant video segments
+│   ├── generate-clip.ts      # Uses FFmpeg to stitch video clips
+│   └── generate-social-post.ts # Generates social media text using OpenAI/Twelve Labs
+├── lib/                      # Server-side utility functions and API clients
+│   ├── twelvelabs.ts         # Twelve Labs API client wrapper
+│   ├── openai.ts             # OpenAI API client wrapper
+│   ├── langchain.ts          # LangChain setup and chatbot integration
+│   ├── ffmpeg.ts             # FFmpeg command execution utilities
+│   └── utils.ts              # General utility functions
+├── styles/
+│   ├── globals.css           # Global Tailwind CSS imports and custom styles
+│   └── tailwind.config.js    # Tailwind CSS configuration
+├── public/
+│   ├── favicon.ico
+│   └── images/               # Static assets
+├── types/
+│   ├── index.d.ts            # TypeScript type definitions
+├── .env.local                # Environment variables
+├── next.config.js
+├── tsconfig.json
+└── package.json
+
+II. Core Pages & Components
+pages/index.tsx (Landing Page)
+
+Purpose: Introduce the application, its benefits, and guide users to start.
+
+Content:
+
+Catchy headline and brief description.
+
+"Get Started" button linking to /upload.
+
+Optional: Feature highlights, examples of generated clips.
+
+pages/upload.tsx (Video Upload)
+
+Purpose: Allow users to upload their video files.
+
+Components:
+
+<VideoUploader />:
+
+Drag-and-drop area or file input button.
+
+Progress indicator during upload.
+
+Validation for file types (e.g., MP4, MOV).
+
+Once uploaded, navigate to /chat with video ID.
+
+API Interaction: Calls /api/upload-video to handle the file.
+
+pages/chat.tsx (Chatbot Interaction & Video Preview)
+
+Purpose: The main interface where users interact with the chatbot and see their video.
+
+Components:
+
+<VideoPlayer />: Displays the uploaded video. Can be updated to show selected clips later.
+
+<ChatInterface />:
+
+Displays chat history (user and bot messages).
+
+Text input field for user messages.
+
+"Send" button.
+
+Loading indicator when the bot is thinking.
+
+State Management: Manages chat history, video metadata, and current processing status.
+
+API Interaction: Calls /api/chat for chatbot responses. Once the chatbot determines the video clips, it triggers /api/search-clips.
+
+pages/results.tsx (Generated Clips & Social Post)
+
+Purpose: Present the generated video clips and suggested social media posts.
+
+Components:
+
+List of <ClipPreviewCard /> components:
+
+Each card shows a thumbnail, duration, and a brief description of the clip.
+
+Options to play, download, or edit the clip.
+
+Option to select/deselect clips for the final output.
+
+<SocialPostPreview />:
+
+Displays the AI-generated text post.
+
+Options to copy, edit, or regenerate the post.
+
+Buttons for direct sharing to social media (e.g., "Share to Instagram").
+
+API Interaction: Triggers /api/generate-clip for final video stitching and /api/generate-social-post for text.
+
+III. API Routes (/api)
+/api/upload-video.ts:
+
+Receives video file from frontend.
+
+Action: Uploads the video to a temporary storage (e.g., AWS S3, Google Cloud Storage) and then initiates the upload to Twelve Labs.
+
+Response: Returns a video ID from Twelve Labs for subsequent processing.
+
+/api/process-video.ts:
+
+Receives the Twelve Labs video ID.
+
+Action: Calls the Twelve Labs API to start indexing and processing the video.
+
+Response: Status of the indexing job.
+
+/api/chat.ts:
+
+Receives user message and chat history.
+
+Action: Passes the input to your LangChain setup, which integrates with OpenAI. The LangChain agent will use the system prompt to determine the user's intent and formulate a response or an action (like searching for clips).
+
+Response: Chatbot's textual response or a signal to proceed with clip generation.
+
+/api/search-clips.ts:
+
+Receives the Twelve Labs video ID and the search query (generated by the chatbot).
+
+Action: Calls the Twelve Labs API to search for relevant segments within the indexed video.
+
+Response: Returns a list of potential clip segments (start/end times, confidence scores).
+
+/api/generate-clip.ts:
+
+Receives the Twelve Labs video ID and selected clip segments (start/end times).
+
+Action: Downloads the necessary video segments (or uses Twelve Labs' clip export if available) and uses FFmpeg (server-side) to stitch them together into a single video file.
+
+Response: URL to the generated video clip.
+
+/api/generate-social-post.ts:
+
+Receives context about the generated clips (e.g., themes, keywords, original user intent).
+
+Action: Uses OpenAI (or Twelve Labs' captioning feature if suitable) to generate a compelling social media text post, including relevant hashtags and emojis.
+
+Response: Suggested social media text.
+
+IV. Backend Logic (lib/)
+lib/twelvelabs.ts:
+
+Functions for uploading videos, checking indexing status, searching for clips, and potentially exporting clips.
+
+lib/openai.ts:
+
+Client initialization for OpenAI.
+
+lib/langchain.ts:
+
+Sets up your LangChain agent. This is where the system prompt is injected, and where you might define tools for your agent (e.g., a "search_video_clips" tool that calls your /api/search-clips endpoint).
+
+lib/ffmpeg.ts:
+
+Utility functions to execute FFmpeg commands on the server to cut and stitch video segments. This will likely involve spawning a child process.
+
+Chatbot System Prompt & Initial Questions
+This section outlines the core intelligence of your application – the chatbot's system prompt and how it will initiate interaction with users.
+
+I. Chatbot System Prompt (LangChain/OpenAI)
+The system prompt is crucial for guiding the LLM's behavior and ensuring it understands its role.
+
+You are an AI video assistant specialized in helping users create engaging social media clips from their uploaded videos. Your primary goal is to understand the user's intent for their video and guide them through the process of generating relevant clips and accompanying social media text.
+
+You have access to a video analysis and clip generation system (Twelve Labs, FFmpeg, OpenAI). Your task is to interpret user requests and formulate clear instructions or queries for this system.
+
+**Here are the main scenarios you need to handle:**
+
+1.  **Direct Clip Request:** The user explicitly states what kind of clip they want.
+    * **Example:** "I want a 30-second highlight reel of the best plays." or "Find all instances where I talk about 'innovation'."
+    * **Your Action:** Extract the specific theme, keywords, desired duration, and any other constraints. Formulate a precise search query for the video analysis system.
+
+2.  **Multi-Topic or Segment Showcase:** The user has a video covering several distinct topics, activities, product features, or segments and wants to create separate clips for each.
+    (This could be a professional showcasing different aspects of their work, a product demo highlighting various features, an event recording with multiple segments, or any video where distinct parts need to be isolated).
+    * **Example:** "This video showcases my recent projects: a kitchen remodel, a bathroom renovation, and a deck build. I need separate clips for each." or "This product demo covers feature A, feature B, and feature C. Can you create clips for each feature?" or "I'm an electrician, this video shows a panel upgrade and new wiring installation. I want clips for each."
+    * **Your Action:** Identify the distinct topics, segments, or items the user wants to highlight. For each, formulate a search query (or guide the user to provide keywords if needed) to find relevant video segments. Aim to find one or more distinct clips for each identified item.
+
+3.  **How-To / Tutorial Video Breakdown:** The user uploads a tutorial and wants to break it down into actionable steps or key sections.
+    * **Example:** "This is a cooking tutorial for making pasta. Can you break it down into steps like 'preparing ingredients,' 'making dough,' 'cooking sauce,' and 'plating'?" or "This video explains how to change a tire. I need clips for each major step."
+    * **Your Action:** Understand the sequential nature of the video. Identify the distinct steps or phases the user wants to highlight. Formulate queries to find the beginning and end of each step, creating a logical progression of clips.
+
+**Your Guiding Principles:**
+
+* **Clarification:** If a user's request is vague or ambiguous, ask clarifying questions to narrow down their intent.
+* **Confirmation:** Before proceeding with clip generation, confirm your understanding of their request.
+* **Guidance:** Proactively suggest ways to get the best clips (e.g., "What are the key moments you want to highlight?").
+* **Conciseness:** Provide helpful but brief responses.
+* **Action-Oriented:** Your ultimate goal is to generate the necessary parameters for the video processing system.
+
+**Constraints:**
+
+* Do not ask for personal information.
+* Do not generate clips without explicit user confirmation of the search criteria.
+* Always be polite and helpful.
+* Assume the video has already been uploaded and indexed by the system.
+
+II. Initial Chatbot Questions
+These questions will be pre-loaded or immediately prompted by the chatbot after a user uploads a video, helping to quickly ascertain their goal.
+
+"Thanks for uploading your video! To help me create the best social media clips, could you tell me a bit about its content and what you're hoping to achieve?"
+
+"Are you looking for specific moments or themes from the video, or do you want to break it down into different sections?"
+
+"For example, are you trying to:
+
+A. Highlight specific actions or topics (e.g., 'best moments,' 'mentions of X')?
+
+B. Showcase different topics, segments, or categories from the video (e.g., 'different services offered,' 'product features,' 'parts of a project,' 'event agenda items')?
+
+C. Break down a 'how-to' or tutorial video into sequential steps (e.g., 'step 1,' 'step 2')?
+Please tell me which option best fits your goal, or describe it in your own words!"
+
+(If user selects B or C, follow up with): "Great! Can you tell me more about the specific topics/segments you're interested in (if you selected B), or the particular steps you'd like to highlight (if you selected C)?"
+
+(General follow-up): "What's the main message or feeling you want your social media clips to convey?"
+
+This comprehensive outline should give you a solid foundation for building your Next.js video clip generation tool!
