@@ -253,7 +253,7 @@ export default function UploadPage() {
           errorMsg = errorData.details || errorData.message || errorMsg;
         } catch (e) {
           // If parsing errorData fails, use the original errorMsg or response statusText
-          errorMsg = response.statusText || errorMsg;
+          errorMsg = response.statusText || errorMsg || (e as string);
         }
         throw new Error(errorMsg);
       }
@@ -308,7 +308,7 @@ export default function UploadPage() {
             const errorData = await response.json();
             errorMsg = errorData.details || errorData.message || errorMsg;
           } catch (e) {
-            errorMsg = response.statusText || errorMsg;
+            errorMsg = response.statusText || errorMsg || (e as string);
           }
           throw new Error(errorMsg);
         }

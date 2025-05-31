@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getVideoDetails } from "@/lib/twelvelabs.server"; // Assuming getVideoDetails is the correct function from your server file
 import { extractClip } from "@/lib/ffmpeg";
 import path from "path";
-import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 
 interface ClipSegment {
@@ -77,7 +76,7 @@ export async function POST(request: NextRequest) {
         0
       )}_${uuidv4().substring(0, 8)}.mp4`;
       try {
-        const { filePath, fileName } = await extractClip(
+        const { fileName } = await extractClip(
           sourceHlsUrl,
           segment.start,
           segment.end,

@@ -2,7 +2,6 @@ import { Task, TwelveLabs } from "twelvelabs-js";
 import FormData from "form-data";
 import axios from "axios";
 import type {
-  VideoTask,
   ListTasksResponse,
   SearchClipData,
   VideoDetails,
@@ -276,7 +275,7 @@ export async function searchVideo(
         typeof errorDetailRaw === "object" &&
         errorDetailRaw !== null &&
         "message" in errorDetailRaw &&
-        typeof (errorDetailRaw as any).message === "string"
+        typeof errorDetailRaw.message === "string"
       ) {
         message = (errorDetailRaw as TwelveLabsApiErrorData).message || message;
       } else if (typeof errorDetailRaw === "string") message = errorDetailRaw;

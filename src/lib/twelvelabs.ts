@@ -88,7 +88,7 @@ export interface VideoDetails
     width: number;
     size_bytes?: number;
   };
-  user_metadata?: Record<string, any>;
+  user_metadata?: Record<string, unknown>;
 }
 
 // Type for the Task object from the SDK, if needed for getVideoProcessingStatus responses through an API route
