@@ -14,11 +14,12 @@ const messageHistories: Record<string, ChatMessageHistory> = {};
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages, sessionId, videoId } = body;
+    const { message, sessionId, videoId } = body;
 
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    // Enhanced validation
+    if (!message || typeof message !== 'string' || !message.trim()) {
       return NextResponse.json(
-        { error: "Messages are required and must be an array." },
+        { error: "Message is required and must be a non-empty string." },
         { status: 400 }
       );
     }
@@ -31,8 +32,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Use the provided sessionId for chat history.
-    // If videoId is also present, it can be used by the LangChain agent for context,
-    // but the history store will be keyed by sessionId.
     const currentSessionKey = sessionId;
 
     // Get or create chat history for the session
@@ -41,105 +40,137 @@ export async function POST(req: NextRequest) {
     }
     const currentMessageHistory = messageHistories[currentSessionKey];
 
-    // Reconstruct history from client, excluding the very last user message (which is the current input)
-    // The `chainWithHistory` will add the last user message itself.
-    // This ensures we don't duplicate the last user message in the history.
-    // Also, convert client-side message format to LangChain message types.
-    // Note: The initial bot messages sent from ChatInterface.tsx are not part of `messages` from client here,
-    // they are only for display. The actual conversation starts with the user's first real message.
-    // The SystemMessage is already part of the `chain`.
-
-    // Clear existing history and rebuild from client messages *before* the latest user input.
-    // This syncs the server-side history with the client's view, minus the latest input.
-    await currentMessageHistory.clear();
-    const historyMessagesForLangchain = messages
-      .slice(0, -1) // Exclude the last message, which is the current input
-      .map((msg: { sender: string; text: string }) => {
-        if (msg.sender === "user") return new HumanMessage(msg.text);
-        if (msg.sender === "bot") return new AIMessage(msg.text);
-        return new HumanMessage(msg.text); // Fallback, should ideally not happen
+    // Only add the new user message to history (don't clear and reconstruct)
+    // The history should persist across requests
+    const userInput = message.trim();
+    
+    // Check for empty input after trimming
+    if (!userInput) {
+      return NextResponse.json({
+        reply: {
+          id: `bot-${Date.now()}`,
+          text: "I didn't receive any message. Could you please try again?",
+          sender: "bot",
+          timestamp: new Date(),
+        },
+        searchPromptData: null,
       });
-
-    for (const lcMessage of historyMessagesForLangchain) {
-      await currentMessageHistory.addMessage(lcMessage);
     }
 
+    // Add the current user message to history
+    await currentMessageHistory.addUserMessage(userInput);
+
     const chainWithHistory = new RunnableWithMessageHistory({
-      runnable: chain, // Your LangChain runnable (prompt + model)
+      runnable: chain,
       getMessageHistory: () => currentMessageHistory,
       inputMessagesKey: "input",
       historyMessagesKey: "history",
     });
 
-    const lastMessage = messages[messages.length - 1];
-    const userInput = lastMessage.text;
+    // Prepare the input with video context
+    const chainInput: any = {
+      input: userInput,
+    };
+
+    // Add video context if videoId is provided
+    if (videoId) {
+      chainInput.video_id_for_context = `Video ID: ${videoId} (This video has been uploaded and is ready for analysis)`;
+    } else {
+      chainInput.video_id_for_context = "No video uploaded yet";
+    }
 
     const result = await chainWithHistory.invoke(
-      {
-        input: userInput,
-        // Pass videoId to the chain if available, so the AI knows about it
-        // The specific key here ('videoId') depends on how your LangChain prompt/chain expects it.
-        // For now, let's assume the prompt can implicitly use it or you'll modify chain to accept it.
-        ...(videoId && { video_id_for_context: videoId }),
-      },
-      { configurable: { sessionId: currentSessionKey } } // Pass sessionKey to LangChain for history
+      chainInput,
+      { configurable: { sessionId: currentSessionKey } }
     );
 
     // The result from LangChain is an AIMessage content
     const botResponseText = result.content as string;
 
-    // Attempt to parse the response as JSON if it looks like a JSON code block
+    // Enhanced JSON parsing with better error handling
     let searchPromptData = null;
-    const jsonRegex = /```json\n([\s\S]*?)\n```/;
-    const jsonMatch = botResponseText.match(jsonRegex);
-
     let plainTextReply = botResponseText;
+
+    // Look for JSON code blocks
+    const jsonRegex = /```json\s*\n([\s\S]*?)\n\s*```/;
+    const jsonMatch = botResponseText.match(jsonRegex);
 
     if (jsonMatch && jsonMatch[1]) {
       try {
-        searchPromptData = JSON.parse(jsonMatch[1]);
-        // If JSON is successfully parsed, we might want to use the 'notesForUser' as the plain text reply
-        // or send a generic message like "I've prepared some search queries for you."
-        if (searchPromptData && searchPromptData.notesForUser) {
-          plainTextReply = searchPromptData.notesForUser;
+        const jsonString = jsonMatch[1].trim();
+        searchPromptData = JSON.parse(jsonString);
+        
+        // Validate the JSON structure
+        if (searchPromptData && 
+            searchPromptData.searchQueries && 
+            Array.isArray(searchPromptData.searchQueries) &&
+            searchPromptData.searchQueries.length > 0) {
+          
+          // Use notesForUser as the plain text reply if available
+          if (searchPromptData.notesForUser) {
+            plainTextReply = searchPromptData.notesForUser;
+          } else {
+            plainTextReply = "I've prepared some search queries for you. Let me know if you'd like to adjust them!";
+          }
+          
+          // Remove the JSON block from the original response if it exists
+          plainTextReply = botResponseText.replace(jsonRegex, '').trim() || plainTextReply;
+          
         } else {
-          plainTextReply =
-            "I've prepared some search queries for you. Please review them.";
+          // Invalid JSON structure, treat as regular response
+          console.warn("AI returned JSON with invalid structure:", searchPromptData);
+          searchPromptData = null;
         }
-        // The AI might still include the JSON block in its textual reply.
-        // We can choose to remove it from plainTextReply if desired, but for now, let's assume `notesForUser` is the primary textual response in this case.
       } catch (e) {
-        console.warn(
-          "AI returned a JSON-like block, but it failed to parse:",
-          e
-        );
-        // Fallback to using the full botResponseText if JSON parsing fails
-        searchPromptData = null; // Ensure it's null if parsing failed
-        plainTextReply = botResponseText;
+        console.warn("AI returned a JSON-like block, but it failed to parse:", e);
+        searchPromptData = null;
+        // Keep the original response including the malformed JSON
       }
     }
 
-    // Add the AI's (potentially modified) plain text response to history
+    // Add the AI's response to history
     await currentMessageHistory.addAIMessage(plainTextReply);
 
     return NextResponse.json({
       reply: {
         id: `bot-${Date.now()}`,
-        text: plainTextReply, // Send the plain text part of the reply
+        text: plainTextReply,
         sender: "bot",
         timestamp: new Date(),
       },
-      searchPromptData: searchPromptData, // This will be null if no valid JSON was found/parsed
+      searchPromptData: searchPromptData,
     });
+
   } catch (error) {
     console.error("Error in /api/chat:", error);
-    let errorMessage = "Internal Server Error";
+    
+    let errorMessage = "I'm experiencing some technical difficulties. Please try again in a moment.";
+    let statusCode = 500;
+    
     if (error instanceof Error) {
-      errorMessage = error.message;
+      // Handle specific error types
+      if (error.message.includes("API key")) {
+        errorMessage = "There's an issue with the AI service configuration. Please contact support.";
+        statusCode = 503;
+      } else if (error.message.includes("rate limit")) {
+        errorMessage = "I'm receiving too many requests right now. Please wait a moment and try again.";
+        statusCode = 429;
+      } else if (error.message.includes("timeout")) {
+        errorMessage = "The request took too long to process. Please try again.";
+        statusCode = 408;
+      } else if (error.message.includes("network")) {
+        errorMessage = "I'm having trouble connecting to the AI service. Please check your connection and try again.";
+        statusCode = 503;
+      }
     }
+    
     return NextResponse.json(
-      { error: "Failed to get chat response", details: errorMessage },
-      { status: 500 }
+      { 
+        error: "Chat service temporarily unavailable", 
+        details: errorMessage,
+        timestamp: new Date().toISOString()
+      },
+      { status: statusCode }
     );
   }
 }
