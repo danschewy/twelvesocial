@@ -2,12 +2,11 @@
 
 import VideoUploader from "@/components/VideoUploader";
 import ChatInterface from "@/components/ChatInterface";
-import type { Metadata } from "next";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 export default function UploadPage() {
   const [videoId, setVideoId] = useState<string | null>(null);
-  const [uploadedVideoFile, setUploadedVideoFile] = useState<File | null>(null);
+  const [, setUploadedVideoFile] = useState<File | null>(null);
 
   // Placeholder: Simulate getting a videoId after a video is "uploaded"
   // In reality, this would be set after a successful call to /api/upload-video

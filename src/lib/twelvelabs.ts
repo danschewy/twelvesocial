@@ -1,4 +1,4 @@
-import { TwelveLabs, Index } from "twelvelabs-js"; // Assuming Index type is exported
+import { CreateTaskParams, Task, TwelveLabs } from "twelvelabs-js"; // Assuming Index type is exported
 import { Readable } from "stream";
 
 const apiKey = process.env.TWELVE_LABS_API_KEY;
@@ -86,9 +86,9 @@ export async function uploadVideoToIndex(
     const buffer = Buffer.from(arrayBuffer);
     const videoStream = Readable.from(buffer);
 
-    const taskParams: any = {
+    const taskParams: CreateTaskParams = {
       indexId: indexId,
-      video_file: videoStream,
+      file: videoStream,
       // language: language, // Temporarily removed
     };
 
@@ -118,7 +118,7 @@ export async function uploadVideoToIndex(
  * @param {string} taskId The ID of the task.
  * @returns {Promise<any>} The task status object from Twelve Labs.
  */
-export async function getVideoProcessingStatus(taskId: string): Promise<any> {
+export async function getVideoProcessingStatus(taskId: string): Promise<Task> {
   try {
     const taskStatus = await twelveLabsClient.task.retrieve(taskId);
     console.log(`Task ${taskId} status: ${taskStatus.status}`);

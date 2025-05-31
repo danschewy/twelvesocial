@@ -4,7 +4,6 @@ import {
   uploadVideoToIndex,
   // getVideoProcessingStatus, // We might need another endpoint for status checking
 } from "@/lib/twelvelabs";
-import { Readable } from "stream";
 
 export async function POST(req: NextRequest) {
   try {

@@ -11,7 +11,7 @@ export default function VideoUploader({ onVideoUploaded }: VideoUploaderProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0); // For XHR based progress
+  const [, setUploadProgress] = useState(0); // For XHR based progress
   const [taskId, setTaskId] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

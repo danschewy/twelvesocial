@@ -8,7 +8,6 @@ import {
   ChatPromptTemplate,
   MessagesPlaceholder,
 } from "@langchain/core/prompts";
-import { RunnableWithMessageHistory } from "@langchain/core/runnables";
 import { ChatMessageHistory } from "langchain/stores/message/in_memory"; // For in-memory history
 
 // The OPENAI_API_KEY is already checked in openai.ts, so we assume it's available here

@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVideoProcessingStatus } from "@/lib/twelvelabs";
 
-interface RouteParams {
-  params: {
-    taskId: string;
-  };
-}
-
-export async function GET(req: NextRequest, { params }: RouteParams) {
-  const { taskId } = params;
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ taskId: string }> }
+) {
+  const { taskId } = await params;
 
   if (!taskId) {
     return NextResponse.json(
@@ -30,9 +27,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     // We need to ensure the response structure matches what VideoUploader.tsx expects for `data.videoId` and `data.status`
     return NextResponse.json({
       taskId: statusData.id, // Echo back the task id
-      videoId: statusData.video_id, // This is crucial for the frontend
       status: statusData.status,
-      metadata: statusData.metadata, // Include other relevant info if needed
       fullResponse: statusData, // Optionally, send the whole response for debugging or richer client-side info
     });
   } catch (error) {

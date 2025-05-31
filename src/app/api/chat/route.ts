@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   chain,
-  SystemMessage,
   HumanMessage,
   AIMessage,
   ChatMessageHistory,
@@ -59,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     const chainWithHistory = new RunnableWithMessageHistory({
       runnable: chain, // Your LangChain runnable (prompt + model)
-      getMessageHistory: (_sessionId) => currentMessageHistory,
+      getMessageHistory: () => currentMessageHistory,
       inputMessagesKey: "input",
       historyMessagesKey: "history",
     });
