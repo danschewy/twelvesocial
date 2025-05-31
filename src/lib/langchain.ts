@@ -12,8 +12,7 @@ import { ChatMessageHistory } from "langchain/stores/message/in_memory"; // For 
 
 // The OPENAI_API_KEY is already checked in openai.ts, so we assume it's available here
 const model = new ChatOpenAI({
-  modelName: "gpt-3.5-turbo", // Or your preferred model
-  temperature: 0.7, // Adjust as needed
+  modelName: "o4-mini", // Or your preferred model
 });
 
 const systemPromptText = `You are an AI video assistant specialized in helping users create engaging social media clips from their uploaded videos. Your primary goal is to understand the user's intent for their video and guide them through the process of generating relevant clips and accompanying social media text.
