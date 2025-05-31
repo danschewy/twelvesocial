@@ -12,3 +12,4 @@ libpulse0
 libavcodec-extra
 libavformat-dev
 libavutil-dev
+libavdevice58
