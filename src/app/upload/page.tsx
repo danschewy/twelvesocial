@@ -844,27 +844,13 @@ export default function UploadPage() {
                             >
                               Download Clip
                             </a>
-                            {videoId && (
+                            {videoId && gClip.downloadUrl && (
                               <Link
-                                href={`/social-preview/${videoId}?clipStart=${
-                                  selectedClips.find(
-                                    (sc) =>
-                                      sc.video_id === videoId &&
-                                      gClip.fileName.includes(
-                                        `${sc.start}_${sc.end}`
-                                      )
-                                  )?.start || ""
-                                }&clipEnd=${
-                                  selectedClips.find(
-                                    (sc) =>
-                                      sc.video_id === videoId &&
-                                      gClip.fileName.includes(
-                                        `${sc.start}_${sc.end}`
-                                      )
-                                  )?.end || ""
-                                }`}
+                                href={`/social-preview/${videoId}?clipUrl=${encodeURIComponent(
+                                  gClip.downloadUrl
+                                )}`}
                                 passHref
-                                legacyBehavior // Required if the child is not a simple <a> tag or if you need to pass ref/onClick etc.
+                                legacyBehavior
                               >
                                 <a
                                   target="_blank"

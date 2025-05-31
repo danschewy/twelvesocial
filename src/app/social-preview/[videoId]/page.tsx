@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import type { VideoDetails, VideoSummaryData } from "@/lib/twelvelabs"; // Assuming VideoDetails is needed for HLS
-import Hls from "hls.js";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import type { VideoSummaryData } from "@/lib/twelvelabs";
 
 interface RefinedSocialPost {
   refinedText: string;
@@ -12,107 +11,31 @@ interface RefinedSocialPost {
 export default function SocialPreviewPage() {
   const params = useParams();
   const router = useRouter();
-  const videoId = params.videoId as string;
+  const searchParams = useSearchParams();
 
-  const [videoDetails, setVideoDetails] = useState<VideoDetails | null>(null);
-  const [hlsUrl, setHlsUrl] = useState<string | null>(null);
+  const videoId = params.videoId as string;
+  const clipUrl = searchParams.get("clipUrl");
+
   const [videoSummary, setVideoSummary] = useState<VideoSummaryData | null>(
     null
   );
   const [socialPost, setSocialPost] = useState<RefinedSocialPost | null>(null);
-  const [isLoadingSummary, setIsLoadingSummary] = useState(true);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [isLoadingPost, setIsLoadingPost] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!videoId) return;
+    if (!clipUrl) {
+      setError("Clip URL is missing. Cannot display video preview.");
+      setIsLoadingData(false);
+      return;
+    }
 
-    const videoElement = document.getElementById(
-      "social-preview-player"
-    ) as HTMLVideoElement | null;
-    let hls: Hls | null = null;
-
-    const fetchVideoDataAndSummary = async () => {
-      setIsLoadingSummary(true);
+    const fetchData = async () => {
+      setIsLoadingData(true);
       setError(null);
       try {
-        // 1. Fetch Video Details (for HLS URL primarily)
-        const detailsRes = await fetch(`/api/video-details/${videoId}`);
-        if (!detailsRes.ok) {
-          const errData = await detailsRes.json();
-          throw new Error(
-            `Failed to fetch video details: ${
-              errData.error || detailsRes.statusText
-            }`
-          );
-        }
-        const details: VideoDetails = await detailsRes.json();
-        setVideoDetails(details);
-        if (details.hls?.video_url) {
-          setHlsUrl(details.hls.video_url);
-          if (videoElement && Hls.isSupported()) {
-            if (hls) {
-              hls.destroy();
-            }
-            hls = new Hls();
-            hls.loadSource(details.hls.video_url);
-            hls.attachMedia(videoElement);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-              videoElement
-                .play()
-                .catch((playError) =>
-                  console.warn(
-                    "Autoplay prevented on social preview page:",
-                    playError
-                  )
-                );
-            });
-            hls.on(Hls.Events.ERROR, function (event, data) {
-              if (data.fatal) {
-                console.error("HLS fatal error (social preview):", data);
-                // Potentially try to recover or display a message
-                switch (data.type) {
-                  case Hls.ErrorTypes.NETWORK_ERROR:
-                    console.error(
-                      "HLS.js: fatal network error encountered, trying to recover"
-                    );
-                    hls?.startLoad();
-                    break;
-                  case Hls.ErrorTypes.MEDIA_ERROR:
-                    console.error(
-                      "HLS.js: fatal media error encountered, trying to recover"
-                    );
-                    hls?.recoverMediaError();
-                    break;
-                  default:
-                    // cannot recover
-                    hls?.destroy();
-                    break;
-                }
-              }
-            });
-          } else if (
-            videoElement &&
-            details.hls?.video_url &&
-            videoElement.canPlayType("application/vnd.apple.mpegurl")
-          ) {
-            videoElement.src = details.hls.video_url;
-            videoElement.addEventListener("loadedmetadata", () => {
-              videoElement
-                .play()
-                .catch((playError) =>
-                  console.warn(
-                    "Autoplay prevented (native HLS on social preview):",
-                    playError
-                  )
-                );
-            });
-          }
-        } else {
-          console.warn("HLS URL not found in video details");
-        }
-
-        // 2. Fetch Video Summary
         const summaryRes = await fetch("/api/generate-video-summary", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -129,7 +52,6 @@ export default function SocialPreviewPage() {
         const summary: VideoSummaryData = await summaryRes.json();
         setVideoSummary(summary);
 
-        // 3. Fetch Refined Social Post (once summary is available)
         if (summary.summary) {
           setIsLoadingPost(true);
           const postRes = await fetch("/api/refine-text-for-social", {
@@ -153,25 +75,17 @@ export default function SocialPreviewPage() {
         console.error("Error in social preview page:", err);
         setError(err.message);
       } finally {
-        setIsLoadingSummary(false);
-        // setIsLoadingPost(false); // This is handled within the summary success block
+        setIsLoadingData(false);
       }
     };
 
-    fetchVideoDataAndSummary();
+    fetchData();
+  }, [videoId, clipUrl]);
 
-    return () => {
-      if (hls) {
-        hls.destroy();
-      }
-    };
-  }, [videoId]);
-
-  // Basic loading and error states for now
-  if (isLoadingSummary)
+  if (isLoadingData)
     return (
       <div className="min-h-screen flex items-center justify-center">
-        Loading video data and summary...
+        Loading summary and post data...
       </div>
     );
   if (error)
@@ -180,10 +94,10 @@ export default function SocialPreviewPage() {
         Error: {error}
       </div>
     );
-  if (!videoDetails || !videoSummary)
+  if (!videoSummary)
     return (
       <div className="min-h-screen flex items-center justify-center">
-        Video data or summary not found.
+        Video summary not found.
       </div>
     );
 
@@ -194,7 +108,6 @@ export default function SocialPreviewPage() {
       .catch((err) => alert("Failed to copy: " + err));
   };
 
-  // We'll add a video player (like HLS.js) and proper layout in the next step.
   return (
     <div className="container mx-auto p-4 min-h-screen">
       <button
@@ -204,32 +117,51 @@ export default function SocialPreviewPage() {
         &larr; Back
       </button>
       <h1 className="text-2xl font-bold mb-4">
-        Social Post Preview for: {videoDetails.metadata?.filename || videoId}
+        Social Post Preview (Video ID: {videoId})
       </h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <h2 className="text-xl font-semibold mb-2">Video Preview</h2>
-          {hlsUrl ? (
-            <video
-              id="social-preview-player"
-              controls
-              playsInline
-              className="w-full aspect-video bg-black rounded"
-            ></video>
+          <h2 className="text-xl font-semibold mb-2">Generated Clip Preview</h2>
+          {clipUrl ? (
+            <div className="mb-2">
+              <video
+                id="social-preview-player"
+                src={clipUrl}
+                controls
+                playsInline
+                className="w-full aspect-video bg-black rounded"
+                onError={(e) => {
+                  console.error("Error playing clip:", e);
+                  setError(
+                    "Could not play the video clip. The URL might be invalid or the format not supported."
+                  );
+                }}
+              ></video>
+              <a
+                href={clipUrl}
+                download
+                className="mt-2 inline-block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                Download Clip
+              </a>
+            </div>
           ) : (
-            // We will integrate HLS.js here in a subsequent step if needed for robust playback
-            <p>Video preview not available.</p>
+            <p>Video clip URL not provided. Preview not available.</p>
           )}
 
           <div className="mt-4 p-4 bg-gray-50 rounded">
-            <h3 className="text-lg font-semibold mb-2">Full Video Summary</h3>
-            {isLoadingSummary ? (
+            <h3 className="text-lg font-semibold mb-2">
+              Full Video Summary (from original video)
+            </h3>
+            {isLoadingData && !videoSummary ? (
               <p>Loading summary...</p>
-            ) : (
+            ) : videoSummary ? (
               <p className="text-sm text-gray-700 whitespace-pre-wrap">
                 {videoSummary.summary}
               </p>
+            ) : (
+              <p>Summary not available.</p>
             )}
           </div>
         </div>
@@ -250,15 +182,11 @@ export default function SocialPreviewPage() {
               </button>
             </div>
           )}
-          {!isLoadingPost && !socialPost && !error && (
-            <p>No social post generated yet, or still loading.</p>
+          {!isLoadingPost && !socialPost && !error && videoSummary && (
+            <p>Social post based on the summary will appear here.</p>
           )}
         </div>
       </div>
     </div>
   );
 }
-
-// HLS.js integration will be added if direct video tag playback is not sufficient or for better controls.
-// For now, a simple video tag is used, assuming the HLS URL works directly in modern browsers.
-// If HLS.js is needed, it would be initialized in a useEffect hook similar to the upload page.
