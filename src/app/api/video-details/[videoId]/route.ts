@@ -6,16 +6,16 @@ import {
 import { VideoDetails } from "@/lib/twelvelabs"; // Shared type
 
 interface VideoDetailsParams {
-  params: {
+  params: Promise<{
     videoId: string;
-  };
+  }>;
 }
 
 export async function GET(
   request: Request, // Not used, but required by Next.js route handler signature
   { params }: VideoDetailsParams
 ) {
-  const { videoId } = params;
+  const { videoId } = await params;
 
   if (!videoId) {
     return NextResponse.json(
