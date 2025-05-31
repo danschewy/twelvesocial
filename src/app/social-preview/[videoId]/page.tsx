@@ -24,7 +24,6 @@ export default function SocialPreviewPage() {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isLoadingPost, setIsLoadingPost] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copySuccess, setCopySuccess] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
 
@@ -99,17 +98,6 @@ export default function SocialPreviewPage() {
 
     fetchData();
   }, [videoId, clipUrl]);
-
-  const handleCopyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-      alert("Failed to copy to clipboard");
-    }
-  };
 
   const handlePromptClick = (prompt: string) => {
     setChatMessage(prompt);

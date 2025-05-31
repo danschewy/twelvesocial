@@ -18,6 +18,13 @@ interface SendTextMessageSuccessResponse {
   statusMessage: string;
 }
 
+interface TwilioError extends Error {
+  code?: number | string; // Twilio error codes can be numbers or strings
+  moreInfo?: string;
+  status?: number; // HTTP status code
+  // Add other properties if you observe them in Twilio error objects
+}
+
 export async function POST(request: NextRequest) {
   if (!twilioClient || !twilioPhoneNumber) {
     console.error(
@@ -95,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     if (error instanceof Error) {
       errorMessage = error.message;
-      const twilioError = error as any;
+      const twilioError = error as TwilioError;
       if (twilioError.code) {
         errorDetails = {
           code: twilioError.code,

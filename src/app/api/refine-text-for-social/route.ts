@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios"; // Import axios
-import { v4 as uuidv4 } from "uuid"; // For session_id if needed
+// import { v4 as uuidv4 } from "uuid"; // For session_id if needed
 
 // Remove direct OpenAI import if no longer used directly
 // import { openai } from "@/lib/openai";
@@ -37,20 +37,20 @@ interface LangflowSerializedMessage {
   sender?: string;
   sender_name?: string;
   session_id?: string;
-  data?: { text?: string; content?: string; [key: string]: any }; // For nested data if present
+  data?: { text?: string; content?: string; [key: string]: unknown }; // Changed any to unknown
   // Add other fields from Langflow Message class if needed for other purposes
-  [key: string]: any;
+  [key: string]: unknown; // Changed any to unknown
 }
 
 // Represents an individual component's output within the LangFlow response
 interface LangflowComponentOutput {
   results?: {
     message?: LangflowSerializedMessage;
-    [key: string]: any;
+    [key: string]: unknown; // Changed any to unknown
   };
   artifacts?: {
     message?: string; // Often contains the direct text output for ChatOutput
-    [key: string]: any;
+    [key: string]: unknown; // Changed any to unknown
   };
   outputs?: {
     // The named outputs of the component itself
@@ -58,29 +58,29 @@ interface LangflowComponentOutput {
       // If the component has an output named "message"
       message?: string; // Actual text often nested here for ChatOutput
       text?: string; // Alternative nesting
-      [key: string]: any;
+      [key: string]: unknown; // Changed any to unknown
     };
-    [key: string]: any; // Other potential named outputs
+    [key: string]: unknown; // Changed any to unknown
   };
   component_display_name?: string;
-  [key: string]: any;
+  [key: string]: unknown; // Changed any to unknown
 }
 
 // Updated LangFlowOutput interface based on actual response structure
 interface LangFlowOutput {
   outputs?: Array<{
     // Outer outputs array (usually one element for the whole flow result)
-    inputs?: any; // Inputs to the flow/first component block
+    inputs?: Record<string, unknown>; // Changed any to Record<string, unknown>
     outputs?: Array<LangflowComponentOutput>; // Inner outputs array (outputs of components in the flow)
   }>;
   result?: {
     message?: LangflowSerializedMessage;
     text?: string;
-    [key: string]: any;
+    [key: string]: unknown; // Changed any to unknown
   };
   raw_output?: string;
   session_id?: string;
-  [key: string]: any;
+  [key: string]: unknown; // Changed any to unknown
 }
 
 const LANGFLOW_ENDPOINT = process.env.LANGFLOW_REFINE_TEXT_ENDPOINT;

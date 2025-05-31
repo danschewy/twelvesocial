@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { s3Client, bucketName } from "@/lib/doSpaces";
 import { PutObjectCommand, ObjectCannedACL } from "@aws-sdk/client-s3";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { v4 as uuidv4 } from "uuid"; // For generating unique filenames if needed
 
 interface UploadToSpaceRequestBody {
@@ -13,6 +13,12 @@ interface UploadToSpaceRequestBody {
 interface UploadToSpaceErrorResponse {
   error: string;
   details?: string | object | null;
+}
+
+interface S3ErrorType extends Error {
+  Code?: string;
+  Message?: string;
+  // Add other common S3 error properties if needed
 }
 
 export async function POST(request: NextRequest) {
@@ -52,12 +58,32 @@ export async function POST(request: NextRequest) {
       console.log(
         `Fetched video. Size: ${fileBuffer.length} bytes. Content-Type: ${resolvedContentType}`
       );
-    } catch (fetchError: any) {
+    } catch (fetchError) {
       console.error("Error fetching video from sourceUrl:", fetchError);
+      let details: string | object = "Unknown fetch error"; // Ensure details can be an object
+      if (axios.isAxiosError(fetchError)) {
+        const axiosError = fetchError as AxiosError<{ message: string }>; // Use AxiosError<any> for broader data type
+        if (axiosError.response?.data) {
+          if (typeof axiosError.response.data === "string") {
+            details = axiosError.response.data;
+          } else if (typeof axiosError.response.data.message === "string") {
+            details = axiosError.response.data.message;
+          } else if (axiosError.message) {
+            details = axiosError.message;
+          } else {
+            details = axiosError.response.data; // Fallback to the whole data object if no message string
+          }
+        } else if (axiosError.message) {
+          details = axiosError.message;
+        }
+      } else if (fetchError instanceof Error) {
+        details = fetchError.message;
+      }
+
       return NextResponse.json<UploadToSpaceErrorResponse>(
         {
           error: "Failed to fetch video from sourceUrl.",
-          details: fetchError.message || "Unknown fetch error",
+          details: details,
         },
         { status: 500 }
       );
@@ -118,9 +144,13 @@ export async function POST(request: NextRequest) {
 
     if (error instanceof Error) {
       errorMessage = error.message;
-      const s3Error = error as any; // For potential S3 error details
+      const s3Error = error as S3ErrorType; // Use defined S3ErrorType
       if (s3Error.Code) {
-        errorDetails = { code: s3Error.Code, message: s3Error.Message };
+        // Check for Code property, which is uppercase in S3 errors
+        errorDetails = {
+          code: s3Error.Code,
+          message: s3Error.Message || s3Error.message,
+        };
       }
     }
     return NextResponse.json<UploadToSpaceErrorResponse>(

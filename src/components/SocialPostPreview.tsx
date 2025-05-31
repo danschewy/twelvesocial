@@ -92,9 +92,13 @@ const SocialPostPreview: React.FC<SocialPostPreviewProps> = ({
       );
       setIsError(false);
       setToPhoneNumber(""); // Clear phone number on success
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error in sending process:", error);
-      setStatusMessage(error.message || "An unknown error occurred.");
+      if (error instanceof Error) {
+        setStatusMessage(error.message);
+      } else {
+        setStatusMessage("An unknown error occurred while sending the SMS.");
+      }
       setIsError(true);
     }
     setIsSending(false);
