@@ -1,6 +1,6 @@
 # 1. Base image: Use a Node.js LTS version
-FROM node:20-alpine AS base
-
+FROM --platform=linux/amd64 node:20-alpine AS base
+RUN corepack enable
 # 2. Set working directory
 WORKDIR /app
 
@@ -64,7 +64,7 @@ EXPOSE 3000
 
 # 10. Command to run the application
 # next start uses the .next build output
-CMD ["yarn", "start"]
+CMD ["npm", "start"]
 
 # Note on Environment Variables:
 # - For sensitive variables (API keys), pass them at runtime using `docker run -e VAR=value ...`.
