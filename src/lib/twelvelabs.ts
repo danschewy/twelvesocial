@@ -38,22 +38,22 @@ interface TwelveLabsError extends Error {
 }
 
 /**
- * Retrieves the manually specified Twelve Labs Index ID from environment variables.
- * @returns {Promise<string>} The Index ID.
- * @throws {Error} If the Index ID is not set.
+ * Retrieves the target Twelve Labs index ID.
+ * Prefers a specific ID if provided, otherwise defaults to the environment variable `TWELVE_LABS_INDEX_ID`.
+ * @param indexId Optional. A specific index ID to use.
+ * @returns The resolved index ID.
+ * @throws Error if no index ID can be determined.
  */
-export async function getManualIndexId(): Promise<string> {
-  const indexId = process.env.TWELVE_LABS_INDEX_ID;
-  if (!indexId) {
+export const getManualIndexId = async (indexId?: string): Promise<string> => {
+  const targetIndexIdToUse = indexId || process.env.TWELVE_LABS_INDEX_ID; // Use process.env here
+  if (!targetIndexIdToUse) {
     throw new Error(
-      "TWELVE_LABS_INDEX_ID is not set in environment variables."
+      "No Twelve Labs Index ID provided and TWELVE_LABS_INDEX_ID is not set in environment."
     );
   }
-  // Optional: Validate index existence using an SDK call or another API call if needed
-  // For now, we assume it's valid if set.
-  console.log("Using manual Twelve Labs Index ID: " + indexId);
-  return indexId;
-}
+  console.log("Using Twelve Labs Index ID: " + targetIndexIdToUse);
+  return targetIndexIdToUse;
+};
 
 /**
  * Uploads a video file to a Twelve Labs index using the REST API.
@@ -98,7 +98,7 @@ export async function uploadVideoToIndex(
     const response = await axios.post(
       TWELVE_LABS_BASE_URL + "/tasks",
       formData, // Pass FormData object directly
-      { headers: headers }
+      { headers: headers, maxBodyLength: Infinity, maxContentLength: Infinity } // Added max limits just in case
     );
 
     const responseData = response.data;
@@ -197,3 +197,116 @@ export async function getVideoProcessingStatus(taskId: string): Promise<Task> {
 
 // TODO: Add function for searching clips once video is indexed
 // export async function searchClipsInVideo(indexId: string, videoId: string, query: string) { ... }
+
+// --- New Interfaces and Function for Listing Videos (Re-added) ---
+interface HLSData {
+  video_url?: string;
+  thumbnail_urls?: string[];
+  status?: string;
+  updated_at?: string;
+}
+
+export interface VideoTask {
+  _id: string;
+  index_id: string;
+  video_id: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  estimated_time?: string;
+  hls?: HLSData;
+  metadata?: {
+    filename?: string;
+    duration?: number;
+    width?: number;
+    height?: number;
+  };
+}
+
+interface ListTasksResponse {
+  data: VideoTask[];
+  page_info: {
+    limit: number;
+    offset?: number;
+    total_results: number;
+    page?: number;
+    total_pages?: number;
+  };
+}
+
+export const listProcessedVideosInIndex = async (
+  indexId: string,
+  page: number = 1,
+  limit: number = 10,
+  sortBy: string = "created_at",
+  sortOption: string = "desc"
+): Promise<ListTasksResponse> => {
+  if (!TWELVE_LABS_API_KEY) {
+    throw new Error("Twelve Labs API key is not set.");
+  }
+  if (!indexId) {
+    throw new Error("Index ID is required to list videos.");
+  }
+
+  const actualLimit = Math.min(limit, 50);
+
+  try {
+    console.log(
+      `Fetching processed videos (tasks) for index ID: ${indexId}, page: ${page}, limit: ${actualLimit}, sort: ${sortBy} ${sortOption}`
+    );
+
+    const queryParams: Record<string, string | number | undefined> = {
+      index_id: indexId,
+      status: "ready",
+      page: page,
+      page_limit: actualLimit,
+      sort_by: sortBy,
+      sort_option: sortOption,
+    };
+
+    const response = await axios.get<ListTasksResponse>(
+      `${TWELVE_LABS_BASE_URL}/tasks`,
+      {
+        headers: {
+          "x-api-key": TWELVE_LABS_API_KEY,
+          "Content-Type": "application/json",
+        },
+        params: queryParams,
+      }
+    );
+
+    console.log(
+      "Twelve Labs API List Tasks (Processed Videos) Response:",
+      response.data
+    );
+
+    if (response.status === 200) {
+      return response.data;
+    } else {
+      const errorData = response.data as any;
+      console.error("Failed to list videos from Twelve Labs", errorData);
+      throw new Error(
+        `Failed to list videos: ${
+          errorData?.message || response.statusText || "Unknown API error"
+        } (Status: ${response.status})`
+      );
+    }
+  } catch (error: any) {
+    console.error("Error listing videos from Twelve Labs:", error);
+    let errorMessage = "Error listing videos from Twelve Labs.";
+    if (error.response) {
+      console.error("Error response data:", error.response.data);
+      const apiError = error.response.data as any;
+      errorMessage = `Twelve Labs API Error: ${
+        apiError?.message || error.response.statusText || "Unknown error"
+      } (Status: ${error.response.status})`;
+    } else if (error.request) {
+      console.error("Error request:", error.request);
+      errorMessage =
+        "No response received from Twelve Labs API while listing videos.";
+    } else {
+      errorMessage = `Error in setting up list videos request: ${error.message}`;
+    }
+    throw new Error(errorMessage);
+  }
+};
