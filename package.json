@@ -16,7 +16,8 @@
     "openai": "^5.0.1",
     "postcss": "^8.5.4",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "twelvelabs-js": "^0.4.9"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
