@@ -1,26 +1,28 @@
-import { CreateTaskParams, Task, TwelveLabs } from "twelvelabs-js"; // Assuming Index type is exported
+import { Task, TwelveLabs } from "twelvelabs-js"; // Keep Task for getVideoProcessingStatus
+// Remove CreateTaskParams if no longer used by SDK methods we keep
+// import { CreateTaskParams } from "twelvelabs-js";
 import { Readable } from "stream";
+import FormData from "form-data"; // For direct API call
+import axios from "axios"; // Import axios
 
-const apiKey = process.env.TWELVE_LABS_API_KEY;
-const manualIndexIdFromEnv = process.env.TWELVE_LABS_INDEX_ID;
+const TWELVE_LABS_API_KEY = process.env.TWELVE_LABS_API_KEY;
+const TWELVE_LABS_BASE_URL = "https://api.twelvelabs.io/v1.3";
 
-if (!apiKey) {
-  throw new Error(
-    "Missing Twelve Labs API Key. TWELVE_LABS_API_KEY must be set in .env.local"
-  );
-}
-if (!manualIndexIdFromEnv) {
-  throw new Error(
-    "Missing Twelve Labs Index ID. TWELVE_LABS_INDEX_ID must be set in .env.local as you are using a manually created index."
+if (!TWELVE_LABS_API_KEY) {
+  console.warn(
+    "Twelve Labs API key not found. Please set TWELVE_LABS_API_KEY environment variable."
   );
 }
 
-// At this point, manualIndexIdFromEnv is guaranteed to be a string.
-const manualIndexId: string = manualIndexIdFromEnv;
+// Initialize the SDK client only if other SDK functionalities are still needed
+// For instance, if getVideoProcessingStatus still uses it.
+// If all twelvelabs interactions become direct API calls, this can be removed.
+const twelveLabsClient = TWELVE_LABS_API_KEY
+  ? new TwelveLabs({ apiKey: TWELVE_LABS_API_KEY })
+  : null;
 
-// Let TypeScript infer the client type
-const twelveLabsClient = new TwelveLabs({ apiKey });
-
+// Define TwelveLabsError and TwelveLabsErrorResponseData if still used by error handling
+// in other functions like getVideoProcessingStatus
 interface TwelveLabsErrorResponseData {
   message?: string;
   // Add other potential fields from Twelve Labs error responses
@@ -29,113 +31,167 @@ interface TwelveLabsErrorResponseData {
 interface TwelveLabsError extends Error {
   response?: {
     data?: TwelveLabsErrorResponseData | string; // data can be an object or sometimes a string
+    status?: number; // Added for better error handling from fetch
   };
+  status?: number; // For fetch errors
+  isAxiosError?: boolean; // For differentiating axios errors
 }
 
 /**
- * Retrieves the manually specified Twelve Labs index by ID.
- * @returns {Promise<string>} The ID of the index.
+ * Retrieves the manually specified Twelve Labs Index ID from environment variables.
+ * @returns {Promise<string>} The Index ID.
+ * @throws {Error} If the Index ID is not set.
  */
 export async function getManualIndexId(): Promise<string> {
-  try {
-    // Verify the index exists and we can access it
-    console.log(
-      `Attempting to retrieve manually specified index with ID: ${manualIndexId}...`
-    );
-    const index = await twelveLabsClient.index.retrieve(manualIndexId);
-    console.log(
-      `Successfully retrieved index: ${index.name} (ID: ${index.id})`
-    );
-    return index.id;
-  } catch (error) {
-    console.error(
-      `Error retrieving manually specified Twelve Labs index (ID: ${manualIndexId}):`,
-      error
-    );
-    const twelveLabsError = error as TwelveLabsError;
-    if (twelveLabsError.response && twelveLabsError.response.data) {
-      const data = twelveLabsError.response.data;
-      const message = typeof data === "string" ? data : data.message;
-      throw new Error(
-        `Twelve Labs API Error retrieving index: ${
-          message || JSON.stringify(data)
-        }`
-      );
-    }
+  const indexId = process.env.TWELVE_LABS_INDEX_ID;
+  if (!indexId) {
     throw new Error(
-      "Failed to retrieve the specified Twelve Labs index. Please check TWELVE_LABS_INDEX_ID."
+      "TWELVE_LABS_INDEX_ID is not set in environment variables."
     );
   }
+  // Optional: Validate index existence using an SDK call or another API call if needed
+  // For now, we assume it's valid if set.
+  console.log("Using manual Twelve Labs Index ID: " + indexId);
+  return indexId;
 }
 
 /**
- * Uploads a video file to the specified Twelve Labs index.
+ * Uploads a video file to a Twelve Labs index using the REST API.
  * @param {string} indexId The ID of the index to upload to.
  * @param {File} videoFile The video file to upload.
- * @param {string} [language="en"] The language of the video.
  * @returns {Promise<string>} The ID of the video processing task.
  */
 export async function uploadVideoToIndex(
   indexId: string,
   videoFile: File
-  // language: string = "en" // Commenting out language due to CreateTaskParams linter error
 ): Promise<string> {
+  if (!TWELVE_LABS_API_KEY) {
+    throw new Error("Twelve Labs API key is not configured.");
+  }
+
+  console.log(
+    'Uploading video "' +
+      videoFile.name +
+      '" to index ' +
+      indexId +
+      " via REST API (axios)..."
+  );
+
+  const arrayBuffer = await videoFile.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  const formData = new FormData();
+  formData.append("index_id", indexId);
+  formData.append("video_file", buffer, {
+    filename: videoFile.name,
+    contentType: videoFile.type,
+  });
+  // Add language if the API supports it and it's needed.
+  // formData.append("language", "en");
+
+  const headers = {
+    "x-api-key": TWELVE_LABS_API_KEY,
+    ...formData.getHeaders(), // axios works well with headers from form-data
+  };
+
   try {
-    console.log(`Uploading video "${videoFile.name}" to index ${indexId}...`);
-    const arrayBuffer = await videoFile.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const videoStream = Readable.from(buffer);
+    const response = await axios.post(
+      TWELVE_LABS_BASE_URL + "/tasks",
+      formData, // Pass FormData object directly
+      { headers: headers }
+    );
 
-    const taskParams: CreateTaskParams = {
-      indexId: indexId,
-      file: videoStream,
-      // language: language, // Temporarily removed
-    };
+    const responseData = response.data;
 
-    // console.log("Task params being sent to Twelve Labs:", taskParams);
-    const task = await twelveLabsClient.task.create(taskParams);
+    // Axios successful responses usually have status in 2xx range
+    // No need to check response.ok like in fetch
 
-    console.log(`Video upload initiated. Task ID: ${task.id}`);
-    return task.id;
-  } catch (error) {
-    console.error("Error uploading video to Twelve Labs:", error);
-    const twelveLabsError = error as TwelveLabsError;
-    if (twelveLabsError.response && twelveLabsError.response.data) {
-      const data = twelveLabsError.response.data;
-      const message = typeof data === "string" ? data : data.message;
-      throw new Error(
-        `Twelve Labs API Error during upload: ${
-          message || JSON.stringify(data)
-        }`
-      );
+    console.log(
+      "Video upload initiated via REST API (axios). Response:",
+      responseData
+    );
+    if (!responseData._id) {
+      throw new Error("Task ID not found in Twelve Labs API response.");
     }
-    throw new Error("Failed to upload video to Twelve Labs.");
+    return responseData._id;
+  } catch (error) {
+    console.error(
+      "Error uploading video to Twelve Labs via REST API (axios):",
+      error
+    );
+    if (axios.isAxiosError(error)) {
+      // When axios.isAxiosError is true, error has AxiosError type
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        const responseData = error.response.data;
+        const status = error.response.status;
+        const errorMessage =
+          typeof responseData === "string"
+            ? responseData
+            : (responseData as TwelveLabsErrorResponseData).message ||
+              JSON.stringify(responseData);
+        // Construct a new error with a clear message
+        const apiError = new Error(
+          "Twelve Labs API Error (" + status + "): " + errorMessage
+        ) as TwelveLabsError; // Cast to our custom error type if needed for consistency
+        apiError.status = status;
+        apiError.response = { data: responseData, status: status };
+        throw apiError;
+      } else if (error.request) {
+        // The request was made but no response was received (e.g., network error)
+        const requestError = new Error(
+          "Twelve Labs API Error: No response received from server. " +
+            error.message
+        ) as TwelveLabsError;
+        // error.request exists here, can be logged if needed: console.log(error.request);
+        throw requestError;
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        const setupError = new Error(
+          "Twelve Labs API Error: Error setting up request. " + error.message
+        ) as TwelveLabsError;
+        throw setupError;
+      }
+    } else {
+      // Non-Axios error (e.g., an error thrown before the axios call)
+      const genericError = new Error(
+        "Failed to upload video: " + (error as Error).message
+      ) as TwelveLabsError;
+      throw genericError;
+    }
   }
 }
 
 /**
  * Checks the status of a video processing task.
+ * Still uses SDK for this example, but could be converted to REST API call too.
  * @param {string} taskId The ID of the task.
- * @returns {Promise<any>} The task status object from Twelve Labs.
+ * @returns {Promise<Task>} The task status object from Twelve Labs.
  */
 export async function getVideoProcessingStatus(taskId: string): Promise<Task> {
+  if (!twelveLabsClient) {
+    throw new Error(
+      "Twelve Labs client is not initialized. API key may be missing."
+    );
+  }
   try {
-    const taskStatus = await twelveLabsClient.task.retrieve(taskId);
-    console.log(`Task ${taskId} status: ${taskStatus.status}`);
-    return taskStatus; // Return the full status object
+    const taskStatus: Task = await twelveLabsClient.task.retrieve(taskId);
+    console.log("Task " + taskId + " status: " + taskStatus.status);
+    return taskStatus;
   } catch (error) {
-    console.error(`Error retrieving status for task ${taskId}:`, error);
+    console.error("Error retrieving status for task " + taskId + ":", error);
     const twelveLabsError = error as TwelveLabsError;
+    // Adjust error handling if SDK error structure is different from fetch error
     if (twelveLabsError.response && twelveLabsError.response.data) {
       const data = twelveLabsError.response.data;
       const message = typeof data === "string" ? data : data.message;
       throw new Error(
-        `Twelve Labs API Error retrieving status: ${
-          message || JSON.stringify(data)
-        }`
+        "Twelve Labs API Error retrieving status: " +
+          (message || JSON.stringify(data))
       );
     }
-    throw new Error("Failed to get video processing status.");
+    throw new Error("Failed to retrieve status for task " + taskId + ".");
   }
 }
 

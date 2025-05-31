@@ -22,14 +22,22 @@ export async function GET(
     // - id (task_id)
     // - video_id (this is the actual ID of the video in Twelve Labs once processed)
     // - status ('pending', 'processing', 'ready', 'failed')
-    // - ... and other metadata.
+    // - metadata (like filename, duration etc. if available and serializable)
+    // - created_at, updated_at
 
     // We need to ensure the response structure matches what VideoUploader.tsx expects for `data.videoId` and `data.status`
-    return NextResponse.json({
-      taskId: statusData.id, // Echo back the task id
+    // Explicitly pick only the necessary and serializable fields.
+    const responsePayload = {
+      taskId: statusData.id,
       status: statusData.status,
-      fullResponse: statusData, // Optionally, send the whole response for debugging or richer client-side info
-    });
+      videoId: statusData.videoId || null,
+      // Add any other specific, serializable fields you need on the client:
+      // e.g., filename: statusData.metadata?.filename,
+      // e.g., createdAt: statusData.created_at,
+      // e.g., updatedAt: statusData.updated_at,
+    };
+
+    return NextResponse.json(responsePayload);
   } catch (error) {
     console.error(`Error fetching status for task ${taskId}:`, error);
     const message =
