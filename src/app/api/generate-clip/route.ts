@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getVideoDetails } from "@/lib/twelvelabs.server"; // Assuming getVideoDetails is the correct function from your server file
+import {
+  getManualIndexId,
+  getVideoDetails,
+} from "@/lib/twelvelabs.server";
 import { extractClip } from "@/lib/ffmpeg";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 
 interface ClipSegment {
-  id?: string; // Optional ID for the segment, could be original search result ID
+  id: string;
   start: number;
   end: number;
 }
@@ -13,7 +16,6 @@ interface ClipSegment {
 interface GenerateClipRequestBody {
   videoId: string;
   segments: ClipSegment[];
-  indexId?: string; // Optional, if you need to specify index not from env
 }
 
 interface GeneratedClipInfo {
@@ -24,97 +26,139 @@ interface GeneratedClipInfo {
   error?: string;
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const body: GenerateClipRequestBody = await request.json();
-    const { videoId, segments, indexId: queryIndexId } = body;
+    const body: GenerateClipRequestBody = await req.json();
+    const { videoId, segments } = body;
 
     if (!videoId) {
       return NextResponse.json(
-        { message: "videoId is required." },
-        { status: 400 }
-      );
-    }
-    if (!segments || segments.length === 0) {
-      return NextResponse.json(
-        { message: "At least one segment is required." },
+        { error: "Video ID is required." },
         { status: 400 }
       );
     }
 
-    // 1. Get Video Details (including HLS URL)
-    // Assuming getManualIndexId is available in twelvelabs.server.ts or using a default
-    // For simplicity, let's assume getVideoDetails can get the indexId if not provided
-    // or you have a way to get the default indexId.
-    // You might need to adjust this part based on your actual getManualIndexId and getVideoDetails setup.
-    const defaultIndexId = process.env.TWELVE_LABS_INDEX_ID;
-    const indexIdToUse = queryIndexId || defaultIndexId;
-
-    if (!indexIdToUse) {
+    if (!segments || !Array.isArray(segments) || segments.length === 0) {
       return NextResponse.json(
-        { message: "Index ID could not be determined." },
+        { error: "At least one segment is required." },
+        { status: 400 }
+      );
+    }
+
+    console.log(`Generating ${segments.length} clips for video ${videoId}`);
+
+    // 1. Get the manually configured Index ID
+    let indexId: string;
+    try {
+      indexId = await getManualIndexId();
+      console.log("Using Twelve Labs Index ID:", indexId);
+    } catch (indexError) {
+      console.error("Failed to get Twelve Labs Index ID:", indexError);
+      const message =
+        indexError instanceof Error
+          ? indexError.message
+          : "Could not retrieve index configuration.";
+      return NextResponse.json(
+        {
+          error: "Server configuration error for clip generation.",
+          details: message,
+        },
         { status: 500 }
       );
     }
 
-    const videoDetails = await getVideoDetails(indexIdToUse, videoId);
-    if (!videoDetails?.hls?.video_url) {
+    // 2. Get video details to verify it exists and get HLS URL
+    let videoDetails;
+    try {
+      videoDetails = await getVideoDetails(indexId, videoId);
+      console.log("Video details retrieved for clip generation");
+    } catch (detailsError) {
+      console.error("Failed to get video details:", detailsError);
+      const message =
+        detailsError instanceof Error
+          ? detailsError.message
+          : "Could not retrieve video details.";
       return NextResponse.json(
-        { message: "HLS stream URL for the video could not be found." },
+        { error: "Video not found or not accessible.", details: message },
         { status: 404 }
       );
     }
-    const sourceHlsUrl = videoDetails.hls.video_url;
-    const originalFileName = videoDetails.system_metadata?.filename || videoId;
 
-    // 2. Process each segment
-    const generatedClips: GeneratedClipInfo[] = [];
-    const processingPromises = segments.map(async (segment, index) => {
-      const clipFileName = `clip_${
-        path.parse(originalFileName).name
-      }_${segment.start.toFixed(0)}-${segment.end.toFixed(
-        0
-      )}_${uuidv4().substring(0, 8)}.mp4`;
+    // 3. Check if HLS URL is available for FFmpeg processing
+    const hlsUrl = videoDetails.hls?.video_url;
+    if (!hlsUrl) {
+      return NextResponse.json(
+        { 
+          error: "Video HLS stream not available for clip generation.",
+          details: "The video must have an HLS stream URL to generate clips."
+        },
+        { status: 400 }
+      );
+    }
+
+    console.log("Using HLS URL for clip generation:", hlsUrl);
+
+    // 4. Generate clips using FFmpeg
+    const clipResults: GeneratedClipInfo[] = [];
+    
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      const duration = segment.end - segment.start;
+      const fileName = `clip_${i + 1}_${segment.start.toFixed(1)}s-${segment.end.toFixed(1)}s_${uuidv4().slice(0, 8)}.mp4`;
+      
       try {
-        const { fileName } = await extractClip(
-          sourceHlsUrl,
+        console.log(`Generating clip ${i + 1}/${segments.length}: ${segment.start}s - ${segment.end}s`);
+        
+        // Use FFmpeg to extract the clip
+        const clipData = await extractClip(
+          hlsUrl,
           segment.start,
           segment.end,
-          clipFileName
+          fileName
         );
-        // For now, the download URL will point to another API route that serves the file
-        generatedClips.push({
+        
+        clipResults.push({
+          id: segment.id,
+          fileName: clipData.fileName,
+          downloadUrl: `/api/download-clip?file=${encodeURIComponent(clipData.fileName)}`,
+          message: `Clip generated successfully (${duration.toFixed(1)}s duration)`,
+        });
+        
+        console.log(`Successfully generated clip: ${clipData.fileName}`);
+        
+      } catch (clipError) {
+        console.error(`Failed to generate clip ${i + 1}:`, clipError);
+        const errorMessage = clipError instanceof Error ? clipError.message : "Unknown FFmpeg error";
+        
+        clipResults.push({
           id: segment.id,
           fileName: fileName,
-          downloadUrl: `/api/download-clip?file=${encodeURIComponent(
-            fileName
-          )}`,
-          message: "Clip generated successfully.",
-        });
-      } catch (error) {
-        console.error(`Error generating clip for segment ${index}:`, error);
-        generatedClips.push({
-          id: segment.id,
-          fileName: clipFileName, // Still provide a filename for reference
           downloadUrl: "",
-          message: `Failed to generate clip for segment (start: ${segment.start}, end: ${segment.end}).`,
-          error:
-            error instanceof Error ? error.message : "Unknown FFmpeg error",
+          message: `Failed to generate clip (${duration.toFixed(1)}s duration)`,
+          error: errorMessage,
         });
       }
-    });
-
-    await Promise.all(processingPromises); // Wait for all clips to be processed
-
-    return NextResponse.json({ data: generatedClips }, { status: 200 });
-  } catch (error: unknown) {
-    console.error("Error in /api/generate-clip:", error);
-    let errorMessage = "Failed to generate clips.";
-    if (error instanceof Error) {
-      errorMessage = error.message;
     }
+
+    const successfulClips = clipResults.filter(clip => !clip.error).length;
+    const failedClips = clipResults.length - successfulClips;
+    
+    console.log(`Clip generation complete: ${successfulClips} successful, ${failedClips} failed`);
+
+    return NextResponse.json({
+      message: `Clip generation complete. ${successfulClips} successful, ${failedClips} failed.`,
+      data: clipResults,
+      videoId: videoId,
+      totalClips: clipResults.length,
+      successfulClips,
+      failedClips,
+    });
+  } catch (error) {
+    console.error("Error in /api/generate-clip:", error);
+    const message =
+      error instanceof Error ? error.message : "An unexpected error occurred.";
     return NextResponse.json(
-      { message: "Failed to generate clips.", details: errorMessage },
+      { error: "Failed to generate clips.", details: message },
       { status: 500 }
     );
   }

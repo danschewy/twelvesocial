@@ -145,7 +145,21 @@ export default function UploadPage() {
             .catch((e) => console.warn("Autoplay prevented or failed:", e));
         });
         hls.on(Hls.Events.ERROR, function (event, data) {
-          console.error("HLS.js error:", data);
+          // Extract only relevant error properties to avoid circular references
+          const errorInfo = {
+            type: data.type,
+            details: data.details,
+            fatal: data.fatal,
+            reason: data.reason,
+            level: data.level,
+            url: data.url,
+            response: data.response ? {
+              code: data.response.code,
+              text: data.response.text
+            } : undefined
+          };
+          console.error("HLS.js error:", errorInfo);
+          
           if (data.fatal) {
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:

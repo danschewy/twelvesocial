@@ -242,7 +242,7 @@ export async function searchVideo(
   indexId: string,
   videoId: string,
   query: string,
-  searchOptions: string[] = ["visual", "conversation"],
+  searchOptions: string[] = ["visual", "audio"],
   pageLimit: number = 50
 ): Promise<SearchClipData[]> {
   if (!TWELVE_LABS_API_KEY)

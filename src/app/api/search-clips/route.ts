@@ -1,56 +1,92 @@
-import { NextResponse } from "next/server";
-import { getManualIndexId, searchVideo } from "@/lib/twelvelabs.server";
-import { SearchClipData } from "@/lib/twelvelabs";
+import { NextRequest, NextResponse } from "next/server";
+import {
+  getManualIndexId,
+  searchVideo,
+} from "@/lib/twelvelabs.server";
 
-interface SearchClipsRequestBody {
-  videoId: string;
-  query: string;
-  searchOptions?: string[];
-  // indexId?: string; // Optional: if you want to allow overriding the default index from client
-}
-
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const body: SearchClipsRequestBody = await request.json();
+    const body = await req.json();
     const { videoId, query, searchOptions } = body;
 
     if (!videoId) {
       return NextResponse.json(
-        { message: "videoId is required." },
+        { error: "Video ID is required." },
         { status: 400 }
       );
     }
-    if (!query) {
+
+    if (!query || typeof query !== "string" || !query.trim()) {
       return NextResponse.json(
-        { message: "query is required." },
+        { error: "Search query is required." },
         { status: 400 }
       );
     }
 
-    // We get the indexId from the environment variable via getManualIndexId
-    // If you were to allow indexId from client, you'd pass body.indexId to it.
-    const indexIdToUse = await getManualIndexId();
+    console.log(`Searching video ${videoId} for: "${query}"`);
 
-    console.log(
-      `API /search-clips: Searching in index '${indexIdToUse}', video '${videoId}' for query '${query}'`
-    );
-
-    const clips: SearchClipData[] = await searchVideo(
-      indexIdToUse,
-      videoId,
-      query,
-      searchOptions // Will default in searchVideo if undefined
-    );
-
-    return NextResponse.json({ data: clips }, { status: 200 });
-  } catch (error: unknown) {
-    console.error("Error in /api/search-clips:", error);
-    let errorMessage = "Failed to search clips.";
-    if (error instanceof Error) {
-      errorMessage = error.message;
+    // 1. Get the manually configured Index ID
+    let indexId: string;
+    try {
+      indexId = await getManualIndexId();
+      console.log("Using Twelve Labs Index ID:", indexId);
+    } catch (indexError) {
+      console.error("Failed to get Twelve Labs Index ID:", indexError);
+      const message =
+        indexError instanceof Error
+          ? indexError.message
+          : "Could not retrieve index configuration.";
+      return NextResponse.json(
+        {
+          error: "Server configuration error for video search.",
+          details: message,
+        },
+        { status: 500 }
+      );
     }
+
+    // 2. Search the video using Twelve Labs
+    let searchResults;
+    try {
+      const options = Array.isArray(searchOptions) 
+        ? searchOptions 
+        : ["visual", "audio"]; // Default search options - only visual and audio are supported by Twelve Labs
+      
+      searchResults = await searchVideo(
+        indexId,
+        videoId,
+        query.trim(),
+        options,
+        50 // page limit
+      );
+      
+      console.log(`Found ${searchResults.length} search results for query: "${query}"`);
+    } catch (searchError) {
+      console.error("Failed to search video:", searchError);
+      const message =
+        searchError instanceof Error
+          ? searchError.message
+          : "Video search failed.";
+      return NextResponse.json(
+        { error: "Video search failed.", details: message },
+        { status: 500 }
+      );
+    }
+
+    // 3. Return the search results
+    return NextResponse.json({
+      message: "Video search completed successfully.",
+      data: searchResults,
+      query: query.trim(),
+      videoId: videoId,
+      searchOptions: searchOptions,
+    });
+  } catch (error) {
+    console.error("Error in /api/search-clips:", error);
+    const message =
+      error instanceof Error ? error.message : "An unexpected error occurred.";
     return NextResponse.json(
-      { message: "Failed to search clips.", details: errorMessage },
+      { error: "Failed to search video clips.", details: message },
       { status: 500 }
     );
   }
