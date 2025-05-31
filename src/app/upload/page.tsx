@@ -4,8 +4,13 @@ import VideoUploader from "@/components/VideoUploader";
 import ChatInterface from "@/components/ChatInterface";
 import { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { VideoTask, SearchClipData } from "@/lib/twelvelabs";
+import {
+  VideoTask,
+  SearchClipData,
+  VideoDetails as VideoDetailsType,
+} from "@/lib/twelvelabs";
 import Image from "next/image"; // Import Next.js Image component
+import Hls from "hls.js"; // Import Hls.js
 
 // Define types for the search prompt data from the AI
 interface SearchQueryItem {
@@ -44,7 +49,8 @@ export default function UploadPage() {
   const [selectedVideoHlsUrl, setSelectedVideoHlsUrl] = useState<string | null>(
     null
   );
-  const videoRef = useRef<HTMLVideoElement>(null); // For HLS if we use hls.js later
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null); // Ref to store Hls instance
 
   // State for search results
   const [searchResults, setSearchResults] = useState<SearchClipData[] | null>(
@@ -52,6 +58,8 @@ export default function UploadPage() {
   );
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [isFetchingVideoDetails, setIsFetchingVideoDetails] =
+    useState<boolean>(false);
 
   useEffect(() => {
     // Generate a session ID when the component mounts
@@ -97,6 +105,101 @@ export default function UploadPage() {
     }
   }, [uploadedVideoFile]);
 
+  // Effect for handling HLS playback
+  useEffect(() => {
+    if (videoRef.current && selectedVideoHlsUrl) {
+      if (Hls.isSupported()) {
+        console.log(
+          "HLS.js is supported. Initializing HLS player for:",
+          selectedVideoHlsUrl
+        );
+        if (hlsRef.current) {
+          hlsRef.current.destroy();
+        }
+        const hls = new Hls();
+        hlsRef.current = hls;
+        hls.loadSource(selectedVideoHlsUrl);
+        hls.attachMedia(videoRef.current);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log("HLS manifest parsed, attempting to play.");
+          videoRef.current
+            ?.play()
+            .catch((e) => console.warn("Autoplay prevented or failed:", e));
+        });
+        hls.on(Hls.Events.ERROR, function (event, data) {
+          console.error("HLS.js error:", data);
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                console.error(
+                  "Fatal network error encountered, trying to recover..."
+                );
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                console.error(
+                  "Fatal media error encountered, trying to recover..."
+                );
+                hls.recoverMediaError();
+                break;
+              default:
+                console.error(
+                  "An unrecoverable HLS error occurred. Destroying HLS instance."
+                );
+                hls.destroy();
+                hlsRef.current = null;
+                break;
+            }
+          }
+        });
+      } else if (
+        videoRef.current.canPlayType("application/vnd.apple.mpegurl")
+      ) {
+        console.log(
+          "HLS.js not supported, but native HLS playback might be available (e.g., Safari). Setting src directly."
+        );
+        videoRef.current.src = selectedVideoHlsUrl;
+        videoRef.current.addEventListener("loadedmetadata", () => {
+          videoRef.current
+            ?.play()
+            .catch((e) =>
+              console.warn("Autoplay prevented or failed (native HLS):", e)
+            );
+        });
+      } else {
+        console.warn(
+          "HLS.js is not supported and native HLS playback is not available. HLS stream may not play."
+        );
+      }
+    } else if (videoRef.current && localPreviewUrl) {
+      // Fallback for local preview URL
+      console.log("Setting video src to local preview URL:", localPreviewUrl);
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+      videoRef.current.src = localPreviewUrl;
+    } else if (videoRef.current) {
+      // Clear src if no HLS and no local preview
+      console.log("No HLS or local preview URL. Clearing video src.");
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+      videoRef.current.removeAttribute("src");
+      videoRef.current.load(); // Reset video element state
+    }
+
+    // Cleanup function
+    return () => {
+      if (hlsRef.current) {
+        console.log("Destroying HLS instance on cleanup.");
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [selectedVideoHlsUrl, localPreviewUrl]); // Re-run when HLS URL or local preview URL changes
+
   const resetSearchState = () => {
     setAiSearchPrompts(null);
     setEditableQueryText("");
@@ -105,21 +208,59 @@ export default function UploadPage() {
     setSearchError(null);
   };
 
-  const handleVideoUploaded = (file: File, twelveLabsVideoId: string) => {
-    setUploadedVideoFile(file);
+  const handleVideoUploaded = async (file: File, twelveLabsVideoId: string) => {
     setVideoId(twelveLabsVideoId);
     setSelectedExistingVideo(null);
-    setSelectedVideoHlsUrl(null); // Clear HLS URL
+    resetSearchState();
     console.log(
-      "Newly uploaded video processed, Twelve Labs Video ID:",
+      "Newly uploaded video processed by Twelve Labs. Video ID:",
       twelveLabsVideoId
     );
-    resetSearchState();
+    console.log("Attempting to fetch HLS stream for preview...");
+    setIsFetchingVideoDetails(true);
+    try {
+      const response = await fetch(`/api/video-details/${twelveLabsVideoId}`);
+      if (!response.ok) {
+        let errorMsg = "Failed to fetch video details from API.";
+        try {
+          const errorData = await response.json();
+          errorMsg = errorData.details || errorData.message || errorMsg;
+        } catch (e) {
+          // If parsing errorData fails, use the original errorMsg or response statusText
+          errorMsg = response.statusText || errorMsg;
+        }
+        throw new Error(errorMsg);
+      }
+      const details: VideoDetailsType = await response.json();
+
+      if (details.hls?.video_url) {
+        setSelectedVideoHlsUrl(details.hls.video_url);
+        setUploadedVideoFile(null);
+        console.log(
+          "HLS stream URL fetched and set for preview:",
+          details.hls.video_url
+        );
+      } else {
+        console.warn(
+          "Video processed, but HLS stream URL not found in details. Will rely on local preview if available, or list selection."
+        );
+        setUploadedVideoFile(file);
+      }
+    } catch (error) {
+      console.error("Error fetching video details for HLS stream:", error);
+      setUploadedVideoFile(file);
+      setErrorLoadingVideos(
+        "Could not load HLS stream for preview. Using local file if possible."
+      );
+    } finally {
+      setIsFetchingVideoDetails(false);
+    }
   };
 
   const handleExistingVideoSelected = (videoTask: VideoTask) => {
     if (videoTask.video_id && videoTask.status === "ready") {
       setVideoId(videoTask.video_id);
+      console.log(videoTask);
       setSelectedExistingVideo(videoTask);
       setUploadedVideoFile(null); // Clear new upload state, which clears localPreviewUrl via useEffect
       setSelectedVideoHlsUrl(videoTask.hls?.video_url || null);
@@ -219,7 +360,7 @@ export default function UploadPage() {
   };
 
   const currentVideoName =
-    selectedExistingVideo?.metadata?.filename || uploadedVideoFile?.name;
+    selectedExistingVideo?.system_metadata?.filename || uploadedVideoFile?.name;
   const videoPreviewSrc = localPreviewUrl || selectedVideoHlsUrl;
 
   return (
@@ -283,11 +424,12 @@ export default function UploadPage() {
                           <p
                             className="font-medium truncate"
                             title={
-                              videoTask.metadata?.filename || videoTask._id
+                              videoTask.system_metadata?.filename ||
+                              videoTask.video_id
                             }
                           >
-                            {videoTask.metadata?.filename ||
-                              `Video ID: ${videoTask.video_id}`}
+                            {videoTask.system_metadata?.filename ||
+                              videoTask.video_id}
                           </p>
                           <p className="text-xs text-gray-400">
                             Uploaded:{" "}
@@ -431,11 +573,12 @@ export default function UploadPage() {
             <h2 className="text-2xl font-semibold mb-4">2. Preview & Chat</h2>
 
             {/* Video Preview Section */}
-            <div className="mb-6 bg-black rounded aspect-video overflow-hidden">
-              {videoPreviewSrc ? (
+            <div className="mb-6 bg-black rounded aspect-video overflow-hidden flex items-center justify-center">
+              {isFetchingVideoDetails ? (
+                <p className="text-gray-400">Fetching video stream...</p>
+              ) : videoPreviewSrc || selectedVideoHlsUrl ? (
                 <video
                   ref={videoRef}
-                  src={videoPreviewSrc}
                   controls
                   className="w-full h-full object-contain"
                   onError={(e) => console.error("Video player error:", e)}

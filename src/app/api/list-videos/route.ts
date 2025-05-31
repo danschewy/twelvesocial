@@ -3,7 +3,7 @@ import {
   getManualIndexId, // Ensure this is the updated version
   listProcessedVideosInIndex,
   // VideoTask is exported from lib/twelvelabs but not directly used in this file's logic
-} from "@/lib/twelvelabs";
+} from "@/lib/twelvelabs.server";
 
 interface ListVideosQuery {
   indexId?: string;

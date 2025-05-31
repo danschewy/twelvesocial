@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getVideoProcessingStatus } from "@/lib/twelvelabs";
+import { getVideoProcessingStatus } from "@/lib/twelvelabs.server";
+import { TwelveLabsSDKTask } from "@/lib/twelvelabs";
 
 export async function GET(
   req: NextRequest,
@@ -16,7 +17,9 @@ export async function GET(
 
   try {
     console.log(`Fetching status for Twelve Labs Task ID: ${taskId}`);
-    const statusData = await getVideoProcessingStatus(taskId);
+    const taskStatus: TwelveLabsSDKTask = await getVideoProcessingStatus(
+      taskId
+    );
 
     // The statusData from twelveLabsClient.task.retrieve(taskId) is expected to contain:
     // - id (task_id)
@@ -28,13 +31,13 @@ export async function GET(
     // We need to ensure the response structure matches what VideoUploader.tsx expects for `data.videoId` and `data.status`
     // Explicitly pick only the necessary and serializable fields.
     const responsePayload = {
-      taskId: statusData.id,
-      status: statusData.status,
-      videoId: statusData.videoId || null,
+      taskId: taskStatus.id,
+      status: taskStatus.status,
+      videoId: taskStatus.videoId || null,
       // Add any other specific, serializable fields you need on the client:
-      // e.g., filename: statusData.metadata?.filename,
-      // e.g., createdAt: statusData.created_at,
-      // e.g., updatedAt: statusData.updated_at,
+      // e.g., filename: taskStatus.metadata?.filename,
+      // e.g., createdAt: taskStatus.created_at,
+      // e.g., updatedAt: taskStatus.updated_at,
     };
 
     return NextResponse.json(responsePayload);

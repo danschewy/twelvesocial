@@ -3,7 +3,7 @@ import {
   getManualIndexId,
   uploadVideoToIndex,
   // getVideoProcessingStatus, // We might need another endpoint for status checking
-} from "@/lib/twelvelabs";
+} from "@/lib/twelvelabs.server";
 
 export async function POST(req: NextRequest) {
   try {

@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  getManualIndexId,
-  searchVideo,
-  SearchClipData,
-} from "@/lib/twelvelabs";
+import { getManualIndexId, searchVideo } from "@/lib/twelvelabs.server";
+import { SearchClipData } from "@/lib/twelvelabs";
 
 interface SearchClipsRequestBody {
   videoId: string;
