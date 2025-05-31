@@ -6,8 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "postinstall": "node scripts/setup-ffmpeg.js"
+    "lint": "next lint"
   },
   "dependencies": {
     "@langchain/core": "^0.3.57",
