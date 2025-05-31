@@ -31,22 +31,32 @@ async function tryFFmpegCommand(
     let ffmpegArgs: string[];
     let env = { ...process.env };
 
-    // Always set environment variables to avoid PulseAudio issues
+    // Comprehensive environment setup to disable all audio systems that might cause issues
     env = {
       ...env,
-      PULSE_RUNTIME_PATH: "/tmp/pulse-runtime",
-      PULSE_STATE_PATH: "/tmp/pulse-state", 
-      PULSE_MACHINE_ID: "dummy",
-      SDL_AUDIODRIVER: "dummy",
-      ALSA_CARD: "dummy",
       // Disable PulseAudio completely
       PULSE_DISABLE: "1",
-      // Force FFmpeg to use ALSA instead of PulseAudio
-      FFMPEG_FORCE_ALSA: "1"
+      PULSE_RUNTIME_PATH: "/tmp",
+      PULSE_STATE_PATH: "/tmp", 
+      PULSE_MACHINE_ID: "/tmp",
+      // Disable SDL audio
+      SDL_AUDIODRIVER: "dummy",
+      // Disable ALSA
+      ALSA_CARD: "dummy",
+      ALSA_DEVICE: "0",
+      // Force no audio output
+      AUDIODEV: "/dev/null",
+      // Disable any X11/display dependencies
+      DISPLAY: "",
+      // Set library path to avoid loading problematic libraries
+      LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu",
+      // Additional FFmpeg-specific settings
+      FFMPEG_FORCE_ALSA: "0",
+      FFMPEG_DISABLE_AUDIO: "1"
     };
 
     if (attempt === 1) {
-      // First attempt: Full encoding with audio but PulseAudio disabled
+      // First attempt: Full encoding with dummy audio source but comprehensive audio disabling
       ffmpegArgs = [
         "-y",
         "-loglevel", "error",
@@ -67,7 +77,7 @@ async function tryFFmpegCommand(
         outputFilePath,
       ];
     } else if (attempt === 2) {
-      // Second attempt: Video only, no audio processing
+      // Second attempt: Video only, no audio processing at all
       ffmpegArgs = [
         "-y",
         "-loglevel", "error",
@@ -97,7 +107,7 @@ async function tryFFmpegCommand(
         outputFilePath,
       ];
     } else {
-      // Fourth attempt: Most basic configuration
+      // Fourth attempt: Most basic configuration with no audio
       ffmpegArgs = [
         "-y",
         "-loglevel", "error",
@@ -113,7 +123,7 @@ async function tryFFmpegCommand(
     }
 
     console.log(`FFmpeg attempt ${attempt}: ffmpeg ${ffmpegArgs.join(" ")}`);
-    console.log(`Environment variables: PULSE_DISABLE=${env.PULSE_DISABLE}, SDL_AUDIODRIVER=${env.SDL_AUDIODRIVER}`);
+    console.log(`Environment variables set: PULSE_DISABLE=${env.PULSE_DISABLE}, SDL_AUDIODRIVER=${env.SDL_AUDIODRIVER}, LD_LIBRARY_PATH=${env.LD_LIBRARY_PATH}`);
 
     const ffmpegProcess = spawn("ffmpeg", ffmpegArgs, { env });
     let stdErrOutput = "";
