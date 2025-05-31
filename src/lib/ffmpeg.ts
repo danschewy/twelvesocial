@@ -31,13 +31,28 @@ async function tryFFmpegCommand(
     let ffmpegArgs: string[];
     let env = { ...process.env };
 
+    // Always set environment variables to avoid PulseAudio issues
+    env = {
+      ...env,
+      PULSE_RUNTIME_PATH: "/tmp/pulse-runtime",
+      PULSE_STATE_PATH: "/tmp/pulse-state", 
+      PULSE_MACHINE_ID: "dummy",
+      SDL_AUDIODRIVER: "dummy",
+      ALSA_CARD: "dummy",
+      // Disable PulseAudio completely
+      PULSE_DISABLE: "1",
+      // Force FFmpeg to use ALSA instead of PulseAudio
+      FFMPEG_FORCE_ALSA: "1"
+    };
+
     if (attempt === 1) {
-      // First attempt: Optimized for containerized environments
+      // First attempt: Full encoding with audio but PulseAudio disabled
       ffmpegArgs = [
         "-y",
         "-loglevel", "error",
         "-nostdin",
         "-hide_banner",
+        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", // Dummy audio source
         "-i", sourceUrl,
         "-ss", startTime.toString(),
         "-t", duration.toString(),
@@ -46,21 +61,13 @@ async function tryFFmpegCommand(
         "-crf", "23",
         "-c:a", "aac",
         "-b:a", "128k",
+        "-shortest", // Use shortest stream
         "-movflags", "+faststart",
         "-avoid_negative_ts", "make_zero",
         outputFilePath,
       ];
-
-      // Set environment variables to avoid PulseAudio issues
-      env = {
-        ...env,
-        PULSE_RUNTIME_PATH: "/tmp/pulse-runtime",
-        PULSE_STATE_PATH: "/tmp/pulse-state",
-        PULSE_MACHINE_ID: "dummy",
-        SDL_AUDIODRIVER: "dummy",
-      };
     } else if (attempt === 2) {
-      // Second attempt: Minimal configuration without audio processing
+      // Second attempt: Video only, no audio processing
       ffmpegArgs = [
         "-y",
         "-loglevel", "error",
@@ -72,9 +79,10 @@ async function tryFFmpegCommand(
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-an", // No audio
+        "-movflags", "+faststart",
         outputFilePath,
       ];
-    } else {
+    } else if (attempt === 3) {
       // Third attempt: Stream copy (fastest but may not work with all HLS streams)
       ffmpegArgs = [
         "-y",
@@ -85,11 +93,27 @@ async function tryFFmpegCommand(
         "-ss", startTime.toString(),
         "-t", duration.toString(),
         "-c", "copy",
+        "-avoid_negative_ts", "make_zero",
+        outputFilePath,
+      ];
+    } else {
+      // Fourth attempt: Most basic configuration
+      ffmpegArgs = [
+        "-y",
+        "-loglevel", "error",
+        "-nostdin",
+        "-hide_banner",
+        "-i", sourceUrl,
+        "-ss", startTime.toString(),
+        "-t", duration.toString(),
+        "-vcodec", "copy",
+        "-an", // No audio
         outputFilePath,
       ];
     }
 
     console.log(`FFmpeg attempt ${attempt}: ffmpeg ${ffmpegArgs.join(" ")}`);
+    console.log(`Environment variables: PULSE_DISABLE=${env.PULSE_DISABLE}, SDL_AUDIODRIVER=${env.SDL_AUDIODRIVER}`);
 
     const ffmpegProcess = spawn("ffmpeg", ffmpegArgs, { env });
     let stdErrOutput = "";
@@ -111,7 +135,7 @@ async function tryFFmpegCommand(
         console.error(`FFmpeg attempt ${attempt} failed with code ${code}.`);
         console.error("FFmpeg stderr output:", stdErrOutput);
         
-        if (attempt < 3) {
+        if (attempt < 4) {
           console.log(`Trying FFmpeg attempt ${attempt + 1}...`);
           tryFFmpegCommand(sourceUrl, startTime, duration, outputFilePath, attempt + 1)
             .then(resolve)
@@ -131,7 +155,7 @@ async function tryFFmpegCommand(
     ffmpegProcess.on("error", (err) => {
       console.error(`Failed to start FFmpeg process (attempt ${attempt}):`, err);
       
-      if (attempt < 3) {
+      if (attempt < 4) {
         console.log(`Trying FFmpeg attempt ${attempt + 1}...`);
         tryFFmpegCommand(sourceUrl, startTime, duration, outputFilePath, attempt + 1)
           .then(resolve)
