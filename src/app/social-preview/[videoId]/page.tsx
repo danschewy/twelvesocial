@@ -63,7 +63,7 @@ export default function SocialPreviewPage() {
             const errData = await postRes.json();
             throw new Error(
               `Failed to refine social post: ${
-                errData.error || postRes.statusText
+                (errData as { error?: string }).error || postRes.statusText
               }`
             );
           }
@@ -71,9 +71,15 @@ export default function SocialPreviewPage() {
           setSocialPost(post);
           setIsLoadingPost(false);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error in social preview page:", err);
-        setError(err.message);
+        if (err instanceof Error) {
+          setError(err.message);
+        } else if (typeof err === "string") {
+          setError(err);
+        } else {
+          setError("An unknown error occurred while fetching data.");
+        }
       } finally {
         setIsLoadingData(false);
       }

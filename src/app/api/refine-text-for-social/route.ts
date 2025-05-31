@@ -12,12 +12,14 @@ interface RefineTextResponse {
 
 interface RefineTextErrorResponse {
   error: string;
-  details?: any;
+  details?: string | object | null;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body: RefineTextRequestBody = await request.json();
+    // Using a type assertion here assuming the request structure is known and validated by the client or a middleware.
+    // For more robustness, consider a validation library like Zod.
+    const body = (await request.json()) as RefineTextRequestBody;
     const { textToRefine, customPrompt } = body;
 
     if (!textToRefine) {
@@ -83,25 +85,35 @@ Please generate a social media post based on this.`;
       { refinedText },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in /api/refine-text-for-social:", error);
     let errorMessage = "Failed to refine text for social media.";
-    let errorDetails = null;
+    let errorDetails: string | object | null = null;
 
-    if (error.response) {
-      // Axios error structure
-      errorMessage = error.response.data?.error?.message || error.message;
-      errorDetails = error.response.data;
-    } else if (error.message) {
-      // General error
+    if (error instanceof Error) {
       errorMessage = error.message;
+      // Safely check for additional properties
+      // OpenAI/Axios errors often have a `response` property with `data`
+      if (
+        "response" in error &&
+        (error as { response: { data: unknown } }).response?.data
+      ) {
+        errorDetails = (error as { response: { data: string | object } })
+          .response.data; // This could be an object
+      } else if ("cause" in error && error.cause) {
+        errorDetails =
+          typeof error.cause === "string"
+            ? error.cause
+            : JSON.stringify(error.cause);
+      }
+    } else if (typeof error === "string") {
+      errorMessage = error;
     }
 
     return NextResponse.json<RefineTextErrorResponse>(
       {
         error: errorMessage,
-        details:
-          errorDetails || (error.cause ? JSON.stringify(error.cause) : null),
+        details: errorDetails,
       },
       { status: 500 }
     );

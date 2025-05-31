@@ -371,7 +371,12 @@ export async function generateVideoSummary(
     throw new Error("Video ID is required to generate a summary.");
   }
 
-  const requestBody: any = {
+  const requestBody: {
+    video_id: string;
+    type: string;
+    prompt?: string;
+    temperature?: number;
+  } = {
     video_id: videoId,
     type: "summary",
   };
@@ -420,15 +425,24 @@ export async function generateVideoSummary(
         "Unexpected response structure from Twelve Labs summarize API."
       );
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error calling Twelve Labs /summarize API:", error);
     if (axios.isAxiosError(error) && error.response) {
       const errorData = error.response.data as TwelveLabsErrorData;
-      const errorMessage =
-        errorData?.message ||
-        (typeof errorData?.detail === "string"
-          ? errorData.detail
-          : JSON.stringify(errorData?.detail));
+      let detailString: string | undefined = undefined;
+      if (errorData?.detail) {
+        if (typeof errorData.detail === "string") {
+          detailString = errorData.detail;
+        } else if (
+          typeof errorData.detail === "object" &&
+          errorData.detail !== null
+        ) {
+          detailString = JSON.stringify(errorData.detail);
+        } else {
+          detailString = String(errorData.detail);
+        }
+      }
+      const errorMessage = errorData?.message || detailString;
       console.error("Twelve Labs API Error Details (Summarize):", errorData);
       throw new Error(
         `Twelve Labs API error (${
@@ -436,11 +450,19 @@ export async function generateVideoSummary(
         }) during summarization: ${errorMessage || "Unknown error"}`
       );
     }
+    // Fallback for non-Axios errors or errors without a response property
     if (error instanceof Error) {
       throw new Error(`Failed to generate video summary: ${error.message}`);
     }
+    // Generic fallback
     throw new Error(
       "Failed to generate video summary due to an unknown error."
     );
   }
+  // This part should ideally not be reached because the function always throws or returns in the try block.
+  // Adding a fallback throw to satisfy linters that might complain about no return path,
+  // though in practice, one of the above throws will occur.
+  throw new Error(
+    "Unexpected state in generateVideoSummary: function did not return or throw as expected."
+  );
 }
