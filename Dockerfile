@@ -3,12 +3,6 @@ FROM --platform=linux/amd64 node:20-alpine AS base
 RUN corepack enable
 # 2. Set working directory
 WORKDIR /app
-
-ENV OPENAI_API_KEY=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
-ENV TWELVE_LABS_API_KEY=tlk_0CD3VSV2QF8HYT2NBEC370XRKZ8E
-ENV TWELVE_LABS_INDEX_NAME=social-media-clips-index
-ENV TWELVE_LABS_INDEX_ID=683a4c50ad10a6d0e935cf33
-
 # 3. Copy package.json and yarn.lock (or package-lock.json)
 # Assuming yarn is used due to no package-lock.json in common files
 COPY package.json yarn.lock* ./
@@ -55,10 +49,6 @@ ENV PORT=3000
 # ENV OPENAI_API_KEY=
 # ENV TWELVE_LABS_API_KEY=
 # ENV TWELVE_LABS_INDEX_ID=
-ENV OPENAI_API_KEY=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
-ENV TWELVE_LABS_API_KEY=tlk_0CD3VSV2QF8HYT2NBEC370XRKZ8E
-ENV TWELVE_LABS_INDEX_NAME=social-media-clips-index
-ENV TWELVE_LABS_INDEX_ID=683a4c50ad10a6d0e935cf33
 # 9. Expose the port the app runs on
 EXPOSE 3000
 
