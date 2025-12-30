@@ -813,7 +813,7 @@ export default function UploadPage() {
                               Clip {index + 1}: {clip.start.toFixed(2)}s - {clip.end.toFixed(2)}s
                             </p>
                             <p className="text-xs text-gray-300">
-                              Score: {clip.score.toFixed(2)} | Confidence: {clip.confidence}
+                              Score: {clip.score?.toFixed(2) ?? 'N/A'} | Confidence: {clip.confidence ?? 'N/A'}
                             </p>
                           </div>
                           <input
